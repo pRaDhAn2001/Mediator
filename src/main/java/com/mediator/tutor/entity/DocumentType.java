@@ -1,0 +1,17 @@
+package com.mediator.tutor.entity;
+
+public enum DocumentType {
+    CLASS_10_MARKSHEET,
+    CLASS_12_MARKSHEET,
+    DEGREE_CERTIFICATE,
+    AADHAAR_CARD,
+    PAN_CARD,
+    PASSPORT,
+    VOTER_ID,
+    DRIVING_LICENSE,
+    ELECTRICITY_BILL,
+    GAS_BILL,
+    BANK_PASSBOOK,
+    EXPERIENCE_CERTIFICATE,
+    CLASSROOM_PHOTO
+}
