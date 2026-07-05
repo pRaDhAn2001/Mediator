@@ -9,15 +9,20 @@ import com.mediator.master.entity.ClassLevel;
 import com.mediator.auth.entity.User;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "students")
-@Data
+@Getter
+@Setter
 @EqualsAndHashCode(callSuper = false)
 @Builder
 @NoArgsConstructor
@@ -58,7 +63,10 @@ public class Student extends BaseEntity {
     private String parentName;
 
     @Column(nullable = false)
+    @NotBlank
+    @Pattern(regexp = "^[6-9]\\d{9}$")
     private String parentPhone;
 
+    @Email
     private String parentEmail;
 }

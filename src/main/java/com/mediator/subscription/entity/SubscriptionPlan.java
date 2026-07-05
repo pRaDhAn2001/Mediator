@@ -17,6 +17,11 @@ import lombok.*;
 @EqualsAndHashCode(callSuper = true)
 public class SubscriptionPlan extends BaseEntity {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "subscription_plan_id")
+    private Long subscriptionPlanId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, unique = true)
     private SubscriptionPlanType planType;

@@ -7,16 +7,18 @@ import com.mediator.tutor.entity.Tutor;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "match_requests")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -47,4 +49,5 @@ public class MatchRequest extends BaseEntity {
     @OneToMany(mappedBy = "matchRequest", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<MatchRequestSubject> requestedSubjects = new ArrayList<>();
+
 }

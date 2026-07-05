@@ -4,18 +4,23 @@ import com.mediator.common.base.BaseEntity;
 import com.mediator.common.base.Gender;
 import com.mediator.common.base.Address;
 import com.mediator.common.base.PreferredMode;
+
+import java.math.BigDecimal;
+
 import com.mediator.auth.entity.User;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "tutors")
-@Data
+@Getter
+@Setter
 @EqualsAndHashCode(callSuper = false)
 @Builder
 @NoArgsConstructor
@@ -54,20 +59,22 @@ public class Tutor extends BaseEntity {
 
     private Double preferredRadius;
 
-    @Column(name = "salary_min")
-    private Double salaryMin;
+    @Column(precision = 10, scale = 2)
+    private BigDecimal salaryMin;
 
-    @Column(name = "salary_max")
-    private Double salaryMax;
+    @Column(precision = 10, scale = 2)
+    private BigDecimal salaryMax;
 
     @Column(length = 1000)
     private String demoVideoUrl;
 
-    @Column(name = "verification_status", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     @Builder.Default
     private VerificationStatus verificationStatus = VerificationStatus.PENDING;
 
-    @Column(name = "profile_status", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     @Builder.Default
     private ProfileStatus profileStatus = ProfileStatus.DRAFT;
 }
