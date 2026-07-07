@@ -32,7 +32,12 @@ spring:
     init:
       mode: never
   
-  logging:
-    level:
-      org.hibernate.SQL: DEBUG
-      org.hibernate.orm.jdbc.bind: TRACE
+logging:
+  level:
+  org.hibernate.SQL: DEBUG
+  org.hibernate.orm.jdbc.bind: TRACE
+
+app:
+  jwt:
+    secret: 4f6e7954686973497341566572794c6f6e675365637265744b6579466f724a5754
+    expiration-ms: 86400000
