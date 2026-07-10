@@ -4,12 +4,18 @@ import com.mediator.common.base.BaseEntity;
 import com.mediator.master.entity.Subject;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
 @Entity
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "student_preferences")
 public class StudentPreference extends BaseEntity {
 

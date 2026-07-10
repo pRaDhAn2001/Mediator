@@ -9,9 +9,6 @@ import com.mediator.master.entity.ClassLevel;
 import com.mediator.auth.entity.User;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -57,16 +54,25 @@ public class Student extends BaseEntity {
     @JoinColumn(name = "board_id")
     private Board board;
 
+    @Column(length = 150)
     private String schoolName;
 
-    @Column(nullable = false)
+    @Column(length = 100)
     private String parentName;
 
-    @Column(nullable = false)
-    @NotBlank
-    @Pattern(regexp = "^[6-9]\\d{9}$")
+    @Column(length = 10)
     private String parentPhone;
 
-    @Email
+    @Column(length = 100)
     private String parentEmail;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private ContactOwner primaryMobileOwner = ContactOwner.SELF;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private ContactOwner primaryEmailOwner = ContactOwner.SELF;
 }

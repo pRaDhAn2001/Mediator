@@ -1,5 +1,6 @@
 package com.mediator.student.repository;
 
+import com.mediator.student.entity.Student;
 import com.mediator.student.entity.StudentPreference;
 
 import java.util.List;
@@ -13,4 +14,6 @@ public interface StudentPreferenceRepository extends JpaRepository<StudentPrefer
     List<StudentPreference> findByStudent_StudentId(Long studentId);
 
     List<StudentPreference> findBySubject_Id(Long subjectId);
+
+    void deleteByStudent(Student student);
 }

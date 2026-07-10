@@ -12,8 +12,14 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StudentDashboardResponse {
+
     private StudentProfileResponse profile;
+
+    private Integer profileCompletion;
+
     private Long activeMatchesCount;
+
     private Long pendingMatchesCount;
+
     private Long cancelledMatchesCount;
 }
