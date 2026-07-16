@@ -37,8 +37,21 @@ public class Subscription extends BaseEntity {
     @Column(nullable = false)
     private LocalDate endDate;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 50)
     private String transactionId;
+
+    @Column(length = 100)
+    private String paymentOrderId; // Razorpay Order Id (Future)
+
+    @Column(length = 100)
+    private String paymentId; // Razorpay Payment Id (Future)
+
+    @Column(length = 255)
+    private String paymentSignature;// Future verification
+
+    @Column(length = 50)
+    @Builder.Default
+    private String paymentMode = "MANUAL";
 
     @Enumerated(EnumType.STRING)
     @Builder.Default

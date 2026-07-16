@@ -1,29 +1,29 @@
 package com.mediator.subscription.dto.response;
 
+import java.math.BigDecimal;
+
 import com.mediator.subscription.entity.SubscriptionPlanType;
-import com.mediator.subscription.entity.SubscriptionStatus;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDate;
-
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SubscriptionResponse {
+public class SubscriptionPlanResponse {
 
-    private Long subscriptionId;
+    private Long subscriptionPlanId;
+
     private SubscriptionPlanType planType;
-    private Double price;
+
+    private BigDecimal price;
+
+    private Integer durationInMonths;
+
     private String description;
-    private LocalDate startDate;
-    private LocalDate endDate;
-    private SubscriptionStatus status;
-    private String transactionId;
-    private Long daysRemaining;
 }

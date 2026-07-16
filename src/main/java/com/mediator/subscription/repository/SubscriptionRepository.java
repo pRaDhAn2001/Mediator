@@ -10,14 +10,18 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface SubscriptionRepository
-        extends JpaRepository<Subscription, Long> {
+public interface SubscriptionRepository extends JpaRepository<Subscription, Long> {
 
-    List<Subscription> findByTutor_TutorId(Long tutorId);
+        List<Subscription> findByTutor_TutorId(Long tutorId);
 
-    Optional<Subscription> findByTutor_TutorIdAndStatus(
-            Long tutorId,
-            SubscriptionStatus status);
+        Optional<Subscription> findByTutor_TutorIdAndStatus(
+                        Long tutorId,
+                        SubscriptionStatus status);
 
-    Optional<Subscription> findTopByTutor_TutorIdOrderByEndDateDesc(Long tutorId);
+        Optional<Subscription> findTopByTutor_TutorIdAndStatusOrderByEndDateDesc(
+                        Long tutorId,
+                        SubscriptionStatus status);
+
+        List<Subscription> findAllByTutor_TutorIdOrderByEndDateDesc(Long tutorId);
+
 }
