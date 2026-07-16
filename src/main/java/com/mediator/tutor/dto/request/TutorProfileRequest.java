@@ -1,34 +1,76 @@
 package com.mediator.tutor.dto.request;
 
-import java.util.List;
+import java.math.BigDecimal;
 
 import com.mediator.common.dto.AddressDto;
 import com.mediator.common.base.Gender;
-import com.mediator.common.base.PreferredMode;
+import com.mediator.common.dto.PreferredModeDto;
 import com.mediator.tutor.dto.academics.AcademicProfileDto;
-import com.mediator.tutor.dto.preference.TutorTeachingPreferenceDto;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class TutorProfileRequest {
 
+    @NotNull
     private Gender gender;
+
+    @NotBlank
+    @Size(max = 1000)
     private String description;
+
+    @Valid
+    @NotNull
     private AddressDto address;
-    private Integer teachingExperienceYears;
-    private Integer industryExperienceYears;
-    private String currentOccupation;
-    private PreferredMode preferredMode;
-    private Double preferredRadius;
-    private Double salaryMin;
-    private Double salaryMax;
-    private String demoVideoUrl;
+
+    @Valid
+    @NotNull
     private AcademicProfileDto academicProfile;
-    private List<TutorTeachingPreferenceDto> teachingPreferences;
+
+    @NotNull
+    @Min(0)
+    @Max(60)
+    private Integer teachingExperienceYears;
+
+    @Min(0)
+    @Max(60)
+    private Integer industryExperienceYears;
+
+    @Size(max = 100)
+    private String currentOccupation;
+
+    @NotNull
+    private PreferredModeDto preferredMode;
+
+    @DecimalMin("0.0")
+    @DecimalMax("50.0")
+    private Double preferredRadius;
+
+    @NotNull
+    @DecimalMin("0.0")
+    private BigDecimal salaryMin;
+
+    @NotNull
+    @DecimalMin("0.0")
+    private BigDecimal salaryMax;
+
+    @Size(max = 1000)
+    private String demoVideoUrl;
+
 }

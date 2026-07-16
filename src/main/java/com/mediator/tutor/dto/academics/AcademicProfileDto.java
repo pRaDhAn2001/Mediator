@@ -4,20 +4,28 @@ import com.mediator.tutor.entity.HighestQualification;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.Getter;
 
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class AcademicProfileDto {
 
     private Double class10Percentage;
+
     private Double class12Percentage;
+
     private HighestQualification highestQualification;
+
     private String degreeName;
+
     private String specialization;
+
     private String instituteName;
+
     private Integer passingYear;
 }

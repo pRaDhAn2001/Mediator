@@ -18,4 +18,6 @@ public interface TutorTeachingPreferenceRepository
     List<TutorTeachingPreference> findByClassLevel_Id(Long classLevelId);
 
     List<TutorTeachingPreference> findByBoard_Id(Long boardId);
+
+    void deleteByTutor_TutorId(Long tutorId);
 }

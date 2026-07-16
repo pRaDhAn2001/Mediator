@@ -1,5 +1,6 @@
 package com.mediator.tutor.repository;
 
+import com.mediator.auth.entity.User;
 import com.mediator.tutor.entity.Tutor;
 
 import java.util.Optional;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface TutorRepository extends JpaRepository<Tutor, Long> {
+
+    Optional<Tutor> findByUser(User user);
 
     Optional<Tutor> findByUser_Email(String email);
 

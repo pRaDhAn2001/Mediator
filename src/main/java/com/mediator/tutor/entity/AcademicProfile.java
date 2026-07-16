@@ -20,31 +20,11 @@ public class AcademicProfile {
     @Enumerated(EnumType.STRING)
     private HighestQualification highestQualification;
 
-    /*
-     * Example:
-     * B.Tech
-     * B.Sc
-     * M.Tech
-     * MBA
-     * Ph.D
-     */
     private String degreeName;
 
-    /*
-     * Example:
-     * Computer Science
-     * Mathematics
-     * Physics
-     */
     private String specialization;
 
-    /*
-     * School or University
-     */
     private String instituteName;
 
-    /*
-     * Graduation / Passing Year
-     */
     private Integer passingYear;
 }

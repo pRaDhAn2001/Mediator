@@ -1,35 +1,24 @@
-package com.mediator.common.base;
+package com.mediator.common.dto;
 
-import jakarta.persistence.Embeddable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Embeddable
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PreferredMode {
+public class PreferredModeDto {
 
-    /**
-     * Online classes
-     */
     @Builder.Default
     private boolean online = false;
 
-    /**
-     * Student travels to Tutor's Home
-     */
     @Builder.Default
     private boolean tutorHome = false;
 
-    /**
-     * Tutor travels to Student's Home
-     */
     @Builder.Default
     private boolean studentHome = false;
 }
