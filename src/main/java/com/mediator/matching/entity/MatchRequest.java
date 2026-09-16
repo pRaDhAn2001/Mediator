@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,4 +51,18 @@ public class MatchRequest extends BaseEntity {
     @Builder.Default
     private List<MatchRequestSubject> requestedSubjects = new ArrayList<>();
 
+    private LocalDateTime connectedAt;
+
+    private LocalDateTime finalizedAt;
+
+    @Column(name = "requested_at", nullable = false)
+    @Builder.Default
+    private LocalDateTime requestedAt = LocalDateTime.now();
+
+    @PrePersist
+    public void onCreate() {
+        if (requestedAt == null) {
+            requestedAt = LocalDateTime.now();
+        }
+    }
 }
