@@ -1,7 +1,9 @@
 package com.mediator.student.service;
 
 import com.mediator.auth.entity.User;
+import com.mediator.common.base.Address;
 import com.mediator.common.base.Gender;
+import com.mediator.common.base.PreferredMode;
 import com.mediator.common.dto.AddressDto;
 import com.mediator.common.dto.PreferredModeDto;
 import com.mediator.common.exception.ResourceNotFoundException;
@@ -38,6 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 import java.util.List;
@@ -64,619 +67,736 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class StudentServiceTest {
 
-    @Mock
-    private StudentRepository studentRepository;
-
-    @Mock
-    private StudentPreferenceRepository studentPreferenceRepository;
-
-    @Mock
-    private SubjectRepository subjectRepository;
-
-    @Mock
-    private BoardRepository boardRepository;
-
-    @Mock
-    private ClassLevelRepository classLevelRepository;
-
-    @Spy
-    private StudentMapper studentMapper = new StudentMapper(
-            new AddressMapper(),
-            new PreferredModeMapper());
-
-    @InjectMocks
-    private StudentService studentService;
-
-    private User studentUser;
-    private Student student;
-    private Board board;
-    private ClassLevel classLevel;
-    private Subject math;
-    private Subject physics;
-
-    @BeforeEach
-    void setUp() {
-
-        /*
-         * User
-         */
-        studentUser = User.builder()
-                .id(1L)
-                .firstName("John")
-                .lastName("Doe")
-                .email("student@test.com")
-                .mobileNumber("9876543210")
-                .build();
-
-        /*
-         * Board
-         */
-        board = Board.builder()
-                .id(1L)
-                .name("CBSE")
-                .build();
-
-        /*
-         * Class Level
-         */
-        classLevel = ClassLevel.builder()
-                .id(8L)
-                .standard(8)
-                .build();
-
-        /*
-         * Subjects
-         */
-        math = Subject.builder()
-                .id(1L)
-                .name("Mathematics")
-                .build();
-
-        physics = Subject.builder()
-                .id(2L)
-                .name("Physics")
-                .build();
-
-        /*
-         * Student
-         */
-        student = Student.builder()
-                .studentId(10L)
-                .user(studentUser)
-                .gender(Gender.MALE)
-                .board(board)
-                .classLevel(classLevel)
-                .schoolName("St Xavier")
-                .parentName("Jane Doe")
-                .parentPhone("9876543210")
-                .parentEmail("student@test.com")
-                .build();
+        @Mock
+        private StudentRepository studentRepository;
+
+        @Mock
+        private StudentPreferenceRepository studentPreferenceRepository;
+
+        @Mock
+        private SubjectRepository subjectRepository;
+
+        @Mock
+        private BoardRepository boardRepository;
+
+        @Mock
+        private ClassLevelRepository classLevelRepository;
+
+        @Spy
+        private StudentMapper studentMapper = new StudentMapper(
+                        new AddressMapper(),
+                        new PreferredModeMapper());
+
+        @InjectMocks
+        private StudentService studentService;
+
+        private User studentUser;
+        private Student student;
+        private Board board;
+        private ClassLevel classLevel;
+        private Subject math;
+        private Subject physics;
+
+        @BeforeEach
+        void setUp() {
+
+                /*
+                 * User
+                 */
+                studentUser = User.builder()
+                                .id(1L)
+                                .firstName("John")
+                                .lastName("Doe")
+                                .email("student@test.com")
+                                .mobileNumber("9876543210")
+                                .build();
+
+                /*
+                 * Board
+                 */
+                board = Board.builder()
+                                .id(1L)
+                                .name("CBSE")
+                                .build();
+
+                /*
+                 * Class Level
+                 */
+                classLevel = ClassLevel.builder()
+                                .id(8L)
+                                .standard(8)
+                                .build();
+
+                /*
+                 * Subjects
+                 */
+                math = Subject.builder()
+                                .id(1L)
+                                .name("Mathematics")
+                                .build();
+
+                physics = Subject.builder()
+                                .id(2L)
+                                .name("Physics")
+                                .build();
+
+                /*
+                 * Student
+                 */
+                student = Student.builder()
+                                .studentId(10L)
+                                .user(studentUser)
+                                .gender(Gender.MALE)
+                                .board(board)
+                                .classLevel(classLevel)
+                                .schoolName("St Xavier")
+                                .parentName("Jane Doe")
+                                .parentPhone("9876543210")
+                                .parentEmail("student@test.com")
+                                .build();
 
-        /*
-         * Mock Security Context
-         */
-        Authentication authentication = mock(Authentication.class);
-        SecurityContext securityContext = mock(SecurityContext.class);
+                /*
+                 * Mock Security Context
+                 */
+                Authentication authentication = mock(Authentication.class);
+                SecurityContext securityContext = mock(SecurityContext.class);
 
-        when(securityContext.getAuthentication())
-                .thenReturn(authentication);
+                lenient().when(securityContext.getAuthentication())
+                                .thenReturn(authentication);
 
-        when(authentication.getName())
-                .thenReturn("student@test.com");
+                lenient().when(authentication.getName())
+                                .thenReturn("student@test.com");
 
-        SecurityContextHolder.setContext(securityContext);
-    }
+                SecurityContextHolder.setContext(securityContext);
+        }
 
-    @AfterEach
-    void tearDown() {
+        @AfterEach
+        void tearDown() {
 
-        SecurityContextHolder.clearContext();
-    }
+                SecurityContextHolder.clearContext();
+        }
 
-    // ============================================================
-    // GET PROFILE
-    // ============================================================
+        // ============================================================
+        // GET PROFILE
+        // ============================================================
 
-    @Test
-    void getProfile_success() {
+        @Test
+        void getProfile_success() {
 
-        StudentPreference preference = new StudentPreference();
+                StudentPreference preference = new StudentPreference();
 
-        preference.setStudent(student);
-        preference.setSubject(math);
+                preference.setStudent(student);
+                preference.setSubject(math);
 
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
 
-        when(studentPreferenceRepository.findByStudent_StudentId(10L))
-                .thenReturn(List.of(preference));
+                when(studentPreferenceRepository.findByStudent_StudentId(10L))
+                                .thenReturn(List.of(preference));
 
-        StudentProfileResponse response = studentService.getProfile();
+                StudentProfileResponse response = studentService.getProfile();
 
-        assertThat(response)
-                .isNotNull();
+                assertThat(response)
+                                .isNotNull();
 
-        assertThat(response.getFirstName())
-                .isEqualTo("John");
+                assertThat(response.getFirstName())
+                                .isEqualTo("John");
 
-        assertThat(response.getBoardName())
-                .isEqualTo("CBSE");
+                assertThat(response.getBoardName())
+                                .isEqualTo("CBSE");
 
-        assertThat(response.getSubjects())
-                .hasSize(1);
+                assertThat(response.getSubjects())
+                                .hasSize(1);
 
-        assertThat(response.getSubjects().get(0).getName())
-                .isEqualTo("Mathematics");
-    }
+                assertThat(response.getSubjects().get(0).getName())
+                                .isEqualTo("Mathematics");
+        }
 
-    @Test
-    void getProfile_success_whenNoPreferencesExist() {
+        @Test
+        void getProfile_success_whenNoPreferencesExist() {
 
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
 
-        when(studentPreferenceRepository.findByStudent_StudentId(10L))
-                .thenReturn(Collections.emptyList());
+                when(studentPreferenceRepository.findByStudent_StudentId(10L))
+                                .thenReturn(Collections.emptyList());
 
-        StudentProfileResponse response = studentService.getProfile();
+                StudentProfileResponse response = studentService.getProfile();
 
-        assertThat(response)
-                .isNotNull();
+                assertThat(response)
+                                .isNotNull();
 
-        assertThat(response.getSubjects())
-                .isEmpty();
-    }
+                assertThat(response.getSubjects())
+                                .isEmpty();
+        }
 
-    @Test
-    void getProfile_throwsNotFound_whenStudentNotExists() {
+        @Test
+        void getProfile_throwsNotFound_whenStudentNotExists() {
 
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.empty());
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> studentService.getProfile())
+                assertThatThrownBy(() -> studentService.getProfile())
 
-                .isInstanceOf(ResourceNotFoundException.class)
+                                .isInstanceOf(ResourceNotFoundException.class)
 
-                .hasMessageContaining(
-                        "Student profile not found");
-    }
+                                .hasMessageContaining(
+                                                "Student profile not found");
+        }
 
-    // ============================================================
-    // GET DASHBOARD
-    // ============================================================
+        // ============================================================
+        // GET DASHBOARD
+        // ============================================================
 
-    @Test
-    void getDashboard_success() {
+        @Test
+        void getDashboard_success() {
 
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
 
-        when(studentPreferenceRepository.findByStudent_StudentId(10L))
-                .thenReturn(List.of());
+                when(studentPreferenceRepository.findByStudent_StudentId(10L))
+                                .thenReturn(List.of());
 
-        StudentDashboardResponse response = studentService.getDashboard();
+                StudentDashboardResponse response = studentService.getDashboard();
 
-        assertThat(response)
-                .isNotNull();
+                assertThat(response)
+                                .isNotNull();
 
-        assertThat(response.getProfile())
-                .isNotNull();
+                assertThat(response.getProfile())
+                                .isNotNull();
 
-        assertThat(response.getProfileCompletion())
-                .isNotNull();
+                assertThat(response.getProfileCompletion())
+                                .isNotNull();
 
-        assertThat(response.getActiveMatchesCount())
-                .isEqualTo(0L);
+                assertThat(response.getActiveMatchesCount())
+                                .isEqualTo(0L);
 
-        assertThat(response.getPendingMatchesCount())
-                .isEqualTo(0L);
+                assertThat(response.getPendingMatchesCount())
+                                .isEqualTo(0L);
 
-        assertThat(response.getCancelledMatchesCount())
-                .isEqualTo(0L);
-    }
+                assertThat(response.getCancelledMatchesCount())
+                                .isEqualTo(0L);
+        }
 
-    // ============================================================
-    // UPDATE PROFILE
-    // ============================================================
+        // ============================================================
+        // UPDATE PROFILE
+        // ============================================================
 
-    @Test
-    void updateProfile_success_sameAsPrimaryPhoneAndEmail() {
+        @Test
+        void updateProfile_success_sameAsPrimaryPhoneAndEmail() {
 
-        StudentProfileRequest request = StudentProfileRequest.builder()
+                StudentProfileRequest request = StudentProfileRequest.builder()
 
-                .gender(Gender.MALE)
+                                .gender(Gender.MALE)
 
-                .boardId(1L)
+                                .boardId(1L)
 
-                .classLevelId(8L)
+                                .classLevelId(8L)
 
-                .schoolName("St Xavier")
+                                .schoolName("St Xavier")
 
-                .parentName("Jane Doe")
+                                .parentName("Jane Doe")
 
-                .sameAsPrimaryPhone(true)
+                                .sameAsPrimaryPhone(true)
 
-                .sameAsPrimaryEmail(true)
+                                .sameAsPrimaryEmail(true)
 
-                .address(
-                        AddressDto.builder()
+                                .address(
+                                                AddressDto.builder()
+                                                                .city("Kolkata")
+                                                                .build())
+
+                                .preferredMode(
+                                                PreferredModeDto.builder()
+                                                                .studentHome(true)
+                                                                .build())
+
+                                .preferredRadius(5.0)
+
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                when(boardRepository.findById(1L))
+                                .thenReturn(Optional.of(board));
+
+                when(classLevelRepository.findById(8L))
+                                .thenReturn(Optional.of(classLevel));
+
+                when(studentPreferenceRepository.findByStudent_StudentId(10L))
+                                .thenReturn(List.of());
+
+                StudentProfileResponse response = studentService.updateProfile(request);
+
+                assertThat(response)
+                                .isNotNull();
+
+                assertThat(student.getParentPhone())
+                                .isEqualTo("9876543210");
+
+                assertThat(student.getPrimaryMobileOwner())
+                                .isEqualTo(ContactOwner.SELF);
+
+                assertThat(student.getParentEmail())
+                                .isEqualTo("student@test.com");
+
+                assertThat(student.getPrimaryEmailOwner())
+                                .isEqualTo(ContactOwner.SELF);
+
+                verify(studentRepository)
+                                .save(student);
+        }
+
+        @Test
+        void updateProfile_success_customParentPhoneAndEmail() {
+
+                StudentProfileRequest request = StudentProfileRequest.builder()
+
+                                .gender(Gender.MALE)
+
+                                .boardId(1L)
+
+                                .classLevelId(8L)
+
+                                .sameAsPrimaryPhone(false)
+
+                                .sameAsPrimaryEmail(false)
+
+                                .parentPhone("9123456789")
+
+                                .parentEmail("parent@test.com")
+
+                                .address(
+                                                AddressDto.builder()
+                                                                .city("Kolkata")
+                                                                .build())
+
+                                .preferredMode(
+                                                PreferredModeDto.builder()
+                                                                .studentHome(true)
+                                                                .build())
+
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                when(boardRepository.findById(1L))
+                                .thenReturn(Optional.of(board));
+
+                when(classLevelRepository.findById(8L))
+                                .thenReturn(Optional.of(classLevel));
+
+                when(studentPreferenceRepository.findByStudent_StudentId(10L))
+                                .thenReturn(List.of());
+
+                studentService.updateProfile(request);
+
+                assertThat(student.getParentPhone())
+                                .isEqualTo("9123456789");
+
+                assertThat(student.getPrimaryMobileOwner())
+                                .isEqualTo(ContactOwner.PARENT);
+
+                assertThat(student.getParentEmail())
+                                .isEqualTo("parent@test.com");
+
+                assertThat(student.getPrimaryEmailOwner())
+                                .isEqualTo(ContactOwner.PARENT);
+
+                verify(studentRepository)
+                                .save(student);
+        }
+
+        @Test
+        void updateProfile_throwsNotFound_whenBoardDoesNotExist() {
+
+                StudentProfileRequest request = StudentProfileRequest.builder()
+                                .boardId(999L)
+                                .classLevelId(8L)
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                when(boardRepository.findById(999L))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> studentService.updateProfile(request))
+
+                                .isInstanceOf(ResourceNotFoundException.class)
+
+                                .hasMessageContaining(
+                                                "Board not found with id");
+        }
+
+        @Test
+        void updateProfile_throwsNotFound_whenClassLevelDoesNotExist() {
+
+                StudentProfileRequest request = StudentProfileRequest.builder()
+                                .boardId(1L)
+                                .classLevelId(999L)
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                when(boardRepository.findById(1L))
+                                .thenReturn(Optional.of(board));
+
+                when(classLevelRepository.findById(999L))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> studentService.updateProfile(request))
+
+                                .isInstanceOf(ResourceNotFoundException.class)
+
+                                .hasMessageContaining(
+                                                "Class Level not found with id");
+        }
+
+        @Test
+        void updateProfile_throwsNotFound_whenStudentDoesNotExist() {
+
+                StudentProfileRequest request = StudentProfileRequest.builder()
+                                .boardId(1L)
+                                .classLevelId(8L)
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> studentService.updateProfile(request))
+
+                                .isInstanceOf(ResourceNotFoundException.class)
+
+                                .hasMessageContaining(
+                                                "Student profile not found");
+        }
+
+        // ============================================================
+        // UPDATE PREFERENCES
+        // ============================================================
+
+        @Test
+        void updatePreferences_success_singleSubject() {
+
+                StudentPreferenceDto dto = StudentPreferenceDto.builder()
+                                .subjectIds(List.of(1L))
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                when(subjectRepository.findAllById(List.of(1L)))
+                                .thenReturn(List.of(math));
+
+                List<SubjectResponse> responses = studentService.updatePreferences(dto);
+
+                assertThat(responses)
+                                .hasSize(1);
+
+                assertThat(responses.get(0).getName())
+                                .isEqualTo("Mathematics");
+
+                verify(studentPreferenceRepository)
+                                .deleteByStudent(student);
+
+                verify(studentPreferenceRepository)
+                                .saveAll(any());
+        }
+
+        @Test
+        void updatePreferences_success_multipleSubjects() {
+
+                StudentPreferenceDto dto = StudentPreferenceDto.builder()
+                                .subjectIds(List.of(1L, 2L))
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                when(subjectRepository.findAllById(List.of(1L, 2L)))
+                                .thenReturn(List.of(math, physics));
+
+                List<SubjectResponse> responses = studentService.updatePreferences(dto);
+
+                assertThat(responses)
+                                .hasSize(2);
+
+                assertThat(responses)
+                                .extracting(SubjectResponse::getName)
+                                .containsExactly(
+                                                "Mathematics",
+                                                "Physics");
+
+                verify(studentPreferenceRepository)
+                                .deleteByStudent(student);
+
+                verify(studentPreferenceRepository)
+                                .saveAll(any());
+        }
+
+        @Test
+        void updatePreferences_success_emptySubjectList() {
+
+                StudentPreferenceDto dto = StudentPreferenceDto.builder()
+                                .subjectIds(List.of())
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                when(subjectRepository.findAllById(List.of()))
+                                .thenReturn(List.of());
+
+                List<SubjectResponse> responses = studentService.updatePreferences(dto);
+
+                assertThat(responses)
+                                .isEmpty();
+
+                /*
+                 * Existing preferences must still be deleted.
+                 */
+                verify(studentPreferenceRepository)
+                                .deleteByStudent(student);
+
+                /*
+                 * No new preferences should be inserted.
+                 */
+                verify(studentPreferenceRepository, never())
+                                .saveAll(any());
+        }
+
+        @Test
+        void updatePreferences_throwsExceptionWhenSubjectNotFound() {
+
+                StudentPreferenceDto dto = StudentPreferenceDto.builder()
+                                .subjectIds(List.of(1L, 99L))
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                /*
+                 * Only Mathematics exists.
+                 * Subject 99 does not exist.
+                 */
+                when(subjectRepository.findAllById(List.of(1L, 99L)))
+                                .thenReturn(List.of(math));
+
+                assertThatThrownBy(() -> studentService.updatePreferences(dto))
+
+                                .isInstanceOf(ResourceNotFoundException.class)
+
+                                .hasMessageContaining(
+                                                "One or more selected subjects do not exist");
+
+                /*
+                 * Existing preferences should not be deleted
+                 * when validation fails before replacement.
+                 */
+                verify(studentPreferenceRepository, never())
+                                .deleteByStudent(any());
+
+                verify(studentPreferenceRepository, never())
+                                .saveAll(any());
+        }
+
+        @Test
+        void updatePreferences_throwsNotFound_whenStudentDoesNotExist() {
+
+                StudentPreferenceDto dto = StudentPreferenceDto.builder()
+                                .subjectIds(List.of(1L))
+                                .build();
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> studentService.updatePreferences(dto))
+
+                                .isInstanceOf(ResourceNotFoundException.class)
+
+                                .hasMessageContaining(
+                                                "Student profile not found");
+
+                verifyNoInteractions(subjectRepository);
+                verifyNoInteractions(studentPreferenceRepository);
+        }
+
+        // ============================================================
+        // GET PREFERENCES
+        // ============================================================
+
+        @Test
+        void getPreferences_success() {
+
+                StudentPreference pref = new StudentPreference();
+
+                pref.setStudent(student);
+                pref.setSubject(math);
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                when(studentPreferenceRepository.findByStudent_StudentId(10L))
+                                .thenReturn(List.of(pref));
+
+                List<SubjectResponse> responses = studentService.getPreferences();
+
+                assertThat(responses)
+                                .hasSize(1);
+
+                assertThat(responses.get(0).getName())
+                                .isEqualTo("Mathematics");
+        }
+
+        @Test
+        void getPreferences_success_whenNoPreferencesExist() {
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.of(student));
+
+                when(studentPreferenceRepository.findByStudent_StudentId(10L))
+                                .thenReturn(Collections.emptyList());
+
+                List<SubjectResponse> responses = studentService.getPreferences();
+
+                assertThat(responses)
+                                .isEmpty();
+        }
+
+        @Test
+        void getPreferences_throwsNotFound_whenStudentDoesNotExist() {
+
+                when(studentRepository.findByUserEmail("student@test.com"))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> studentService.getPreferences())
+
+                                .isInstanceOf(ResourceNotFoundException.class)
+
+                                .hasMessageContaining(
+                                                "Student profile not found");
+
+                verifyNoInteractions(studentPreferenceRepository);
+        }
+
+        @Test
+        void calculateProfileCompletion_shouldNotCountBlankStringFields() {
+
+                Student testStudent = Student.builder()
+                                .schoolName(" ")
+                                .parentName("")
+                                .parentPhone("   ")
+                                .parentEmail("")
+                                .build();
+
+                Integer result = ReflectionTestUtils.invokeMethod(
+                                studentService,
+                                "calculateProfileCompletion",
+                                testStudent,
+                                List.of());
+
+                assertThat(result).isEqualTo(0);
+        }
+
+        @Test
+        void calculateProfileCompletion_shouldCountNonBlankStringFields() {
+
+                Student testStudent = Student.builder()
+                                .schoolName("St Xavier")
+                                .parentName("Jane Doe")
+                                .parentPhone("9876543210")
+                                .parentEmail("parent@test.com")
+                                .build();
+
+                Integer result = ReflectionTestUtils.invokeMethod(
+                                studentService,
+                                "calculateProfileCompletion",
+                                testStudent,
+                                List.of());
+
+                assertThat(result).isEqualTo(36);
+        }
+
+        @Test
+        void calculateProfileCompletion_shouldHandleNullPreferences() {
+
+                Student testStudent = Student.builder().build();
+
+                Integer result = ReflectionTestUtils.invokeMethod(
+                                studentService,
+                                "calculateProfileCompletion",
+                                testStudent,
+                                (Object) null);
+
+                assertThat(result).isEqualTo(0);
+        }
+
+        @Test
+        void calculateProfileCompletion_shouldHandleEmptyPreferences() {
+
+                Student testStudent = Student.builder().build();
+
+                Integer result = ReflectionTestUtils.invokeMethod(
+                                studentService,
+                                "calculateProfileCompletion",
+                                testStudent,
+                                Collections.emptyList());
+
+                assertThat(result).isEqualTo(0);
+        }
+
+        @Test
+        void calculateProfileCompletion_shouldCountNonEmptyPreferences() {
+
+                Student testStudent = Student.builder().build();
+
+                StudentPreference preference = new StudentPreference();
+
+                Integer result = ReflectionTestUtils.invokeMethod(
+                                studentService,
+                                "calculateProfileCompletion",
+                                testStudent,
+                                List.of(preference));
+
+                assertThat(result).isEqualTo(9);
+        }
+
+        @Test
+        void calculateProfileCompletion_shouldReturn100WhenAllFieldsAreCompleted() {
+
+                Address address = Address.builder()
                                 .city("Kolkata")
-                                .build())
-
-                .preferredMode(
-                        PreferredModeDto.builder()
-                                .studentHome(true)
-                                .build())
-
-                .preferredRadius(5.0)
-
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        when(boardRepository.findById(1L))
-                .thenReturn(Optional.of(board));
-
-        when(classLevelRepository.findById(8L))
-                .thenReturn(Optional.of(classLevel));
-
-        when(studentPreferenceRepository.findByStudent_StudentId(10L))
-                .thenReturn(List.of());
-
-        StudentProfileResponse response = studentService.updateProfile(request);
-
-        assertThat(response)
-                .isNotNull();
-
-        assertThat(student.getParentPhone())
-                .isEqualTo("9876543210");
-
-        assertThat(student.getPrimaryMobileOwner())
-                .isEqualTo(ContactOwner.SELF);
-
-        assertThat(student.getParentEmail())
-                .isEqualTo("student@test.com");
-
-        assertThat(student.getPrimaryEmailOwner())
-                .isEqualTo(ContactOwner.SELF);
-
-        verify(studentRepository)
-                .save(student);
-    }
-
-    @Test
-    void updateProfile_success_customParentPhoneAndEmail() {
-
-        StudentProfileRequest request = StudentProfileRequest.builder()
-
-                .gender(Gender.MALE)
-
-                .boardId(1L)
-
-                .classLevelId(8L)
-
-                .sameAsPrimaryPhone(false)
-
-                .sameAsPrimaryEmail(false)
-
-                .parentPhone("9123456789")
-
-                .parentEmail("parent@test.com")
-
-                .address(
-                        AddressDto.builder()
-                                .city("Kolkata")
-                                .build())
-
-                .preferredMode(
-                        PreferredModeDto.builder()
-                                .studentHome(true)
-                                .build())
-
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        when(boardRepository.findById(1L))
-                .thenReturn(Optional.of(board));
-
-        when(classLevelRepository.findById(8L))
-                .thenReturn(Optional.of(classLevel));
-
-        when(studentPreferenceRepository.findByStudent_StudentId(10L))
-                .thenReturn(List.of());
-
-        studentService.updateProfile(request);
-
-        assertThat(student.getParentPhone())
-                .isEqualTo("9123456789");
-
-        assertThat(student.getPrimaryMobileOwner())
-                .isEqualTo(ContactOwner.PARENT);
-
-        assertThat(student.getParentEmail())
-                .isEqualTo("parent@test.com");
-
-        assertThat(student.getPrimaryEmailOwner())
-                .isEqualTo(ContactOwner.PARENT);
-
-        verify(studentRepository)
-                .save(student);
-    }
-
-    @Test
-    void updateProfile_throwsNotFound_whenBoardDoesNotExist() {
-
-        StudentProfileRequest request = StudentProfileRequest.builder()
-                .boardId(999L)
-                .classLevelId(8L)
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        when(boardRepository.findById(999L))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> studentService.updateProfile(request))
-
-                .isInstanceOf(ResourceNotFoundException.class)
-
-                .hasMessageContaining(
-                        "Board not found with id");
-    }
-
-    @Test
-    void updateProfile_throwsNotFound_whenClassLevelDoesNotExist() {
-
-        StudentProfileRequest request = StudentProfileRequest.builder()
-                .boardId(1L)
-                .classLevelId(999L)
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        when(boardRepository.findById(1L))
-                .thenReturn(Optional.of(board));
-
-        when(classLevelRepository.findById(999L))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> studentService.updateProfile(request))
-
-                .isInstanceOf(ResourceNotFoundException.class)
-
-                .hasMessageContaining(
-                        "Class Level not found with id");
-    }
-
-    @Test
-    void updateProfile_throwsNotFound_whenStudentDoesNotExist() {
-
-        StudentProfileRequest request = StudentProfileRequest.builder()
-                .boardId(1L)
-                .classLevelId(8L)
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> studentService.updateProfile(request))
-
-                .isInstanceOf(ResourceNotFoundException.class)
-
-                .hasMessageContaining(
-                        "Student profile not found");
-    }
-
-    // ============================================================
-    // UPDATE PREFERENCES
-    // ============================================================
-
-    @Test
-    void updatePreferences_success_singleSubject() {
-
-        StudentPreferenceDto dto = StudentPreferenceDto.builder()
-                .subjectIds(List.of(1L))
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        when(subjectRepository.findAllById(List.of(1L)))
-                .thenReturn(List.of(math));
-
-        List<SubjectResponse> responses = studentService.updatePreferences(dto);
-
-        assertThat(responses)
-                .hasSize(1);
-
-        assertThat(responses.get(0).getName())
-                .isEqualTo("Mathematics");
-
-        verify(studentPreferenceRepository)
-                .deleteByStudent(student);
-
-        verify(studentPreferenceRepository)
-                .saveAll(any());
-    }
-
-    @Test
-    void updatePreferences_success_multipleSubjects() {
-
-        StudentPreferenceDto dto = StudentPreferenceDto.builder()
-                .subjectIds(List.of(1L, 2L))
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        when(subjectRepository.findAllById(List.of(1L, 2L)))
-                .thenReturn(List.of(math, physics));
-
-        List<SubjectResponse> responses = studentService.updatePreferences(dto);
-
-        assertThat(responses)
-                .hasSize(2);
-
-        assertThat(responses)
-                .extracting(SubjectResponse::getName)
-                .containsExactly(
-                        "Mathematics",
-                        "Physics");
-
-        verify(studentPreferenceRepository)
-                .deleteByStudent(student);
-
-        verify(studentPreferenceRepository)
-                .saveAll(any());
-    }
-
-    @Test
-    void updatePreferences_success_emptySubjectList() {
-
-        StudentPreferenceDto dto = StudentPreferenceDto.builder()
-                .subjectIds(List.of())
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        when(subjectRepository.findAllById(List.of()))
-                .thenReturn(List.of());
-
-        List<SubjectResponse> responses = studentService.updatePreferences(dto);
-
-        assertThat(responses)
-                .isEmpty();
-
-        /*
-         * Existing preferences must still be deleted.
-         */
-        verify(studentPreferenceRepository)
-                .deleteByStudent(student);
-
-        /*
-         * No new preferences should be inserted.
-         */
-        verify(studentPreferenceRepository, never())
-                .saveAll(any());
-    }
-
-    @Test
-    void updatePreferences_throwsExceptionWhenSubjectNotFound() {
-
-        StudentPreferenceDto dto = StudentPreferenceDto.builder()
-                .subjectIds(List.of(1L, 99L))
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        /*
-         * Only Mathematics exists.
-         * Subject 99 does not exist.
-         */
-        when(subjectRepository.findAllById(List.of(1L, 99L)))
-                .thenReturn(List.of(math));
-
-        assertThatThrownBy(() -> studentService.updatePreferences(dto))
-
-                .isInstanceOf(ResourceNotFoundException.class)
-
-                .hasMessageContaining(
-                        "One or more selected subjects do not exist");
-
-        /*
-         * Existing preferences should not be deleted
-         * when validation fails before replacement.
-         */
-        verify(studentPreferenceRepository, never())
-                .deleteByStudent(any());
-
-        verify(studentPreferenceRepository, never())
-                .saveAll(any());
-    }
-
-    @Test
-    void updatePreferences_throwsNotFound_whenStudentDoesNotExist() {
-
-        StudentPreferenceDto dto = StudentPreferenceDto.builder()
-                .subjectIds(List.of(1L))
-                .build();
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> studentService.updatePreferences(dto))
-
-                .isInstanceOf(ResourceNotFoundException.class)
-
-                .hasMessageContaining(
-                        "Student profile not found");
-
-        verifyNoInteractions(subjectRepository);
-        verifyNoInteractions(studentPreferenceRepository);
-    }
-
-    // ============================================================
-    // GET PREFERENCES
-    // ============================================================
-
-    @Test
-    void getPreferences_success() {
-
-        StudentPreference pref = new StudentPreference();
-
-        pref.setStudent(student);
-        pref.setSubject(math);
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        when(studentPreferenceRepository.findByStudent_StudentId(10L))
-                .thenReturn(List.of(pref));
-
-        List<SubjectResponse> responses = studentService.getPreferences();
-
-        assertThat(responses)
-                .hasSize(1);
-
-        assertThat(responses.get(0).getName())
-                .isEqualTo("Mathematics");
-    }
-
-    @Test
-    void getPreferences_success_whenNoPreferencesExist() {
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.of(student));
-
-        when(studentPreferenceRepository.findByStudent_StudentId(10L))
-                .thenReturn(Collections.emptyList());
-
-        List<SubjectResponse> responses = studentService.getPreferences();
-
-        assertThat(responses)
-                .isEmpty();
-    }
-
-    @Test
-    void getPreferences_throwsNotFound_whenStudentDoesNotExist() {
-
-        when(studentRepository.findByUserEmail("student@test.com"))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> studentService.getPreferences())
-
-                .isInstanceOf(ResourceNotFoundException.class)
-
-                .hasMessageContaining(
-                        "Student profile not found");
-
-        verifyNoInteractions(studentPreferenceRepository);
-    }
+                                .build();
+
+                PreferredMode preferredMode = PreferredMode.builder()
+                                .online(true)
+                                .build();
+
+                Student testStudent = Student.builder()
+                                .gender(Gender.MALE)
+                                .address(address)
+                                .preferredMode(preferredMode)
+                                .preferredRadius(5.0)
+                                .classLevel(classLevel)
+                                .board(board)
+                                .schoolName("St Xavier")
+                                .parentName("Jane Doe")
+                                .parentPhone("9876543210")
+                                .parentEmail("parent@test.com")
+                                .build();
+
+                StudentPreference preference = new StudentPreference();
+
+                Integer result = ReflectionTestUtils.invokeMethod(
+                                studentService,
+                                "calculateProfileCompletion",
+                                testStudent,
+                                List.of(preference));
+
+                assertThat(result).isEqualTo(100);
+        }
 }

@@ -2,12 +2,16 @@ package com.mediator.tutor.service;
 
 import com.mediator.auth.entity.User;
 import com.mediator.auth.repository.UserRepository;
+import com.mediator.common.base.Address;
 import com.mediator.common.base.Gender;
+import com.mediator.common.base.PreferredMode;
 import com.mediator.common.dto.AddressDto;
 import com.mediator.common.dto.PreferredModeDto;
 import com.mediator.common.exception.BadRequestException;
 import com.mediator.common.exception.ResourceNotFoundException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.test.util.ReflectionTestUtils;
+
 import com.mediator.common.mapper.AddressMapper;
 import com.mediator.common.mapper.PreferredModeMapper;
 import com.mediator.master.entity.Board;
@@ -27,10 +31,12 @@ import com.mediator.tutor.dto.preference.TutorTeachingPreferenceDto;
 import com.mediator.tutor.dto.request.TutorProfileRequest;
 import com.mediator.tutor.dto.request.TutorTeachingPreferenceRequest;
 import com.mediator.tutor.dto.response.TutorProfileResponse;
+import com.mediator.tutor.entity.AcademicProfile;
 import com.mediator.tutor.entity.DocumentType;
 import com.mediator.tutor.entity.ProfileStatus;
 import com.mediator.tutor.entity.Tutor;
 import com.mediator.tutor.entity.TutorDocument;
+import com.mediator.tutor.entity.TutorTeachingPreference;
 import com.mediator.tutor.entity.VerificationStatus;
 import com.mediator.tutor.mapper.AcademicProfileMapper;
 import com.mediator.tutor.mapper.TutorMapper;
@@ -85,6 +91,15 @@ class TutorServiceTest {
 
         @Mock
         private SubscriptionRepository subscriptionRepository;
+
+        @Mock
+        private AddressMapper addressMapper;
+
+        @Mock
+        private PreferredModeMapper preferredModeMapper;
+
+        @Mock
+        private AcademicProfileMapper academicProfileMapper;
 
         @Spy
         private TutorMapper tutorMapper = new TutorMapper(
@@ -781,4 +796,255 @@ class TutorServiceTest {
                 verify(tutorDocumentRepository, never())
                                 .delete(any(TutorDocument.class));
         }
+
+        // Additional branch coverage for teaching preferences and profile completion
+
+        @Test
+        void updateTeachingPreferences_throwsNotFound_whenTutorProfileDoesNotExist() {
+                when(userRepository.findByEmail("tutor@test.com"))
+                                .thenReturn(Optional.of(tutorUser));
+                when(tutorRepository.findByUser(tutorUser))
+                                .thenReturn(Optional.empty());
+
+                TutorTeachingPreferenceRequest request = TutorTeachingPreferenceRequest.builder()
+                                .preferences(List.of(TutorTeachingPreferenceDto.builder()
+                                                .subjectId(1L).boardId(1L).classLevelId(8L).build()))
+                                .build();
+
+                assertThatThrownBy(() -> tutorService.updateTeachingPreferences("tutor@test.com", request))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("Tutor profile not found.");
+
+                verify(teachingPreferenceRepository, never()).deleteByTutor_TutorId(anyLong());
+                verify(teachingPreferenceRepository, never()).saveAll(any());
+        }
+
+        @Test
+        void updateTeachingPreferences_throwsBadRequest_whenPreferencesAreNull() {
+                when(userRepository.findByEmail("tutor@test.com"))
+                                .thenReturn(Optional.of(tutorUser));
+                when(tutorRepository.findByUser(tutorUser))
+                                .thenReturn(Optional.of(tutor));
+
+                TutorTeachingPreferenceRequest request = TutorTeachingPreferenceRequest.builder()
+                                .preferences(null)
+                                .build();
+
+                assertThatThrownBy(() -> tutorService.updateTeachingPreferences("tutor@test.com", request))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessageContaining("At least one teaching preference is required.");
+
+                verify(teachingPreferenceRepository, never()).deleteByTutor_TutorId(anyLong());
+        }
+
+        @Test
+        void updateTeachingPreferences_throwsNotFound_whenBoardDoesNotExistAfterSubjectLookup() {
+                when(userRepository.findByEmail("tutor@test.com"))
+                                .thenReturn(Optional.of(tutorUser));
+                when(tutorRepository.findByUser(tutorUser))
+                                .thenReturn(Optional.of(tutor));
+                when(subjectRepository.findById(1L)).thenReturn(Optional.of(math));
+                when(boardRepository.findById(999L)).thenReturn(Optional.empty());
+
+                TutorTeachingPreferenceRequest request = TutorTeachingPreferenceRequest.builder()
+                                .preferences(List.of(TutorTeachingPreferenceDto.builder()
+                                                .subjectId(1L).boardId(999L).classLevelId(8L).build()))
+                                .build();
+
+                assertThatThrownBy(() -> tutorService.updateTeachingPreferences("tutor@test.com", request))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("Board not found.");
+
+                verify(teachingPreferenceRepository, never()).saveAll(any());
+        }
+
+        @Test
+        void getTeachingPreferences_throwsNotFound_whenTutorProfileDoesNotExist() {
+                when(userRepository.findByEmail("tutor@test.com"))
+                                .thenReturn(Optional.of(tutorUser));
+                when(tutorRepository.findByUser(tutorUser))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> tutorService.getTeachingPreferences("tutor@test.com"))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("Tutor profile not found.");
+
+                verifyNoInteractions(teachingPreferenceRepository);
+        }
+
+        @Test
+        void getDocuments_throwsNotFound_whenTutorProfileDoesNotExist() {
+                when(userRepository.findByEmail("tutor@test.com"))
+                                .thenReturn(Optional.of(tutorUser));
+                when(tutorRepository.findByUser(tutorUser))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> tutorService.getDocuments("tutor@test.com"))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("Tutor profile not found.");
+
+                verifyNoInteractions(tutorDocumentRepository);
+        }
+
+        @Test
+        void calculateProfileCompletion_shouldCountOnlyNonBlankOptionalTextAndDocuments() {
+                Tutor partial = Tutor.builder()
+                                .tutorId(10L)
+                                .description(" ")
+                                .currentOccupation("")
+                                .demoVideoUrl(" ")
+                                .build();
+
+                when(tutorDocumentRepository.findByTutor_TutorId(10L))
+                                .thenReturn(List.of());
+
+                Integer completion = ReflectionTestUtils.invokeMethod(
+                                tutorService, "calculateProfileCompletion", partial);
+
+                assertThat(completion).isEqualTo(0);
+
+                partial.setDescription("A bio");
+                partial.setCurrentOccupation("Teacher");
+                partial.setDemoVideoUrl("https://example.com/demo");
+                when(tutorDocumentRepository.findByTutor_TutorId(10L))
+                                .thenReturn(List.of(TutorDocument.builder()
+                                                .documentId(1L).tutor(partial)
+                                                .documentType(DocumentType.AADHAAR_CARD)
+                                                .documentUrl("https://example.com/doc.pdf")
+                                                .build()));
+
+                Integer completed = ReflectionTestUtils.invokeMethod(
+                                tutorService, "calculateProfileCompletion", partial);
+
+                assertThat(completed).isEqualTo(30); // 4 of 13 fields
+        }
+
+        @Test
+        void updateProfileStatus_shouldSetLiveAtCompletionThresholdAndSaveOnlyWhenChanged() {
+                Tutor complete = Tutor.builder()
+                                .tutorId(10L)
+                                .gender(Gender.MALE)
+                                .description("Bio")
+                                .address(Address.builder().city("Kolkata").build())
+                                .academicProfile(AcademicProfile.builder().build())
+                                .teachingExperienceYears(5)
+                                .industryExperienceYears(2)
+                                .currentOccupation("Teacher")
+                                .preferredMode(PreferredMode.builder().online(true).build())
+                                .preferredRadius(10.0)
+                                .salaryMin(BigDecimal.valueOf(500))
+                                .salaryMax(BigDecimal.valueOf(1000))
+                                .demoVideoUrl("https://example.com/demo")
+                                .build();
+
+                when(tutorDocumentRepository.findByTutor_TutorId(10L))
+                                .thenReturn(List.of(TutorDocument.builder()
+                                                .documentId(1L).tutor(complete)
+                                                .documentType(DocumentType.AADHAAR_CARD)
+                                                .documentUrl("https://example.com/doc.pdf")
+                                                .build()));
+
+                ReflectionTestUtils.invokeMethod(tutorService, "updateProfileStatus", complete);
+
+                assertThat(complete.getProfileStatus()).isEqualTo(ProfileStatus.LIVE);
+                verify(tutorRepository).save(complete);
+
+                // Already LIVE: status remains unchanged and no second save is performed.
+                ReflectionTestUtils.invokeMethod(tutorService, "updateProfileStatus", complete);
+                verify(tutorRepository, times(1)).save(complete);
+        }
+
+        @Test
+        void updateProfileStatus_shouldSetDraftBelowCompletionThreshold() {
+                Tutor incomplete = Tutor.builder()
+                                .tutorId(10L)
+                                .description(" ")
+                                .profileStatus(ProfileStatus.LIVE)
+                                .build();
+
+                when(tutorDocumentRepository.findByTutor_TutorId(10L))
+                                .thenReturn(List.of());
+
+                ReflectionTestUtils.invokeMethod(tutorService, "updateProfileStatus", incomplete);
+
+                assertThat(incomplete.getProfileStatus()).isEqualTo(ProfileStatus.DRAFT);
+                verify(tutorRepository).save(incomplete);
+        }
+
+        @Test
+        void mapDocuments_shouldReturnEmptyListWhenDocumentsAreNull() {
+
+                TutorMapper tutorMapper = new TutorMapper(
+                                addressMapper,
+                                preferredModeMapper,
+                                academicProfileMapper);
+
+                List<TutorDocumentDto> result = ReflectionTestUtils.invokeMethod(
+                                tutorMapper,
+                                "mapDocuments",
+                                (Object) null);
+
+                assertThat(result).isNotNull();
+                assertThat(result).isEmpty();
+        }
+
+        @Test
+        void mapDocuments_shouldMapDocumentFields() {
+
+                TutorMapper tutorMapper = new TutorMapper(
+                                addressMapper,
+                                preferredModeMapper,
+                                academicProfileMapper);
+
+                TutorDocument document = new TutorDocument();
+
+                document.setDocumentType(DocumentType.AADHAAR_CARD);
+                document.setDocumentUrl("https://example.com/aadhaar.pdf");
+
+                List<TutorDocumentDto> result = ReflectionTestUtils.invokeMethod(
+                                tutorMapper,
+                                "mapDocuments",
+                                List.of(document));
+
+                assertThat(result).hasSize(1);
+
+                TutorDocumentDto dto = result.get(0);
+
+                assertThat(dto.getDocumentType())
+                                .isEqualTo(DocumentType.AADHAAR_CARD);
+
+                assertThat(dto.getDocumentUrl())
+                                .isEqualTo("https://example.com/aadhaar.pdf");
+        }
+
+        @Test
+        void toPreferenceDto_shouldMapIds() {
+
+                TutorMapper tutorMapper = new TutorMapper(
+                                addressMapper,
+                                preferredModeMapper,
+                                academicProfileMapper);
+
+                Subject subject = new Subject();
+                subject.setId(1L);
+
+                ClassLevel classLevel = new ClassLevel();
+                classLevel.setId(8L);
+
+                Board board = new Board();
+                board.setId(2L);
+
+                TutorTeachingPreference preference = new TutorTeachingPreference();
+
+                preference.setSubject(subject);
+                preference.setClassLevel(classLevel);
+                preference.setBoard(board);
+
+                TutorTeachingPreferenceDto result = tutorMapper.toPreferenceDto(preference);
+
+                assertThat(result.getSubjectId()).isEqualTo(1L);
+                assertThat(result.getClassLevelId()).isEqualTo(8L);
+                assertThat(result.getBoardId()).isEqualTo(2L);
+        }
+
 }

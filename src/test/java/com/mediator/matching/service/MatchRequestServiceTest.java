@@ -4,10 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,6 +48,8 @@ import com.mediator.tutor.repository.TutorRepository;
 import com.mediator.tutor.repository.TutorTeachingPreferenceRepository;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -755,20 +760,17 @@ class MatchRequestServiceTest {
         }
 
         @Test
-        void getRequestDetails_unauthorizedUser() {
-
-                MatchRequest request = createRequestEntity(
-                                MatchRequestStatus.REQUESTED);
+        void getRequestDetails_unauthorizedUser_throwsAccessDeniedException() {
+                MatchRequest request = createRequestEntity(MatchRequestStatus.REQUESTED);
 
                 when(matchRequestRepository.findById(100L))
                                 .thenReturn(Optional.of(request));
 
-                assertThatThrownBy(() -> matchRequestService.getRequestDetails(
-                                "other@test.com",
-                                100L))
-                                .isInstanceOf(BadRequestException.class)
-                                .hasMessageContaining(
-                                                "not allowed to view");
+                assertThatThrownBy(() -> matchRequestService.getRequestDetails("other@test.com", 100L))
+                                .isInstanceOf(AccessDeniedException.class)
+                                .hasMessage("You are not allowed to view this match request.");
+
+                verify(matchRequestRepository, never()).save(any(MatchRequest.class));
         }
 
         @Test
@@ -1356,4 +1358,501 @@ class MatchRequestServiceTest {
                                 .hasMessageContaining(
                                                 "not allowed to modify");
         }
+
+        @Test
+        void getStudentRequests_studentProfileNotFound() {
+                when(userRepository.findByEmail("student@test.com"))
+                                .thenReturn(Optional.of(studentUser));
+
+                when(studentRepository.findByUser(studentUser))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> matchRequestService.getStudentRequests("student@test.com"))
+                                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        void getTutorRequests_userNotFound() {
+                when(userRepository.findByEmail("missing@test.com"))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> matchRequestService.getTutorRequests("missing@test.com"))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("User not found");
+        }
+
+        @Test
+        void getTutorRequests_tutorProfileNotFound() {
+                when(userRepository.findByEmail("tutor@test.com"))
+                                .thenReturn(Optional.of(tutorUser));
+
+                when(tutorRepository.findByUser(tutorUser))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> matchRequestService.getTutorRequests("tutor@test.com"))
+                                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        void getStudentRequests_noRequests_returnsEmptyList() {
+                mockStudent("student@test.com");
+
+                when(matchRequestRepository.findByStudent_StudentId(10L))
+                                .thenReturn(List.of());
+
+                List<MatchRequestResponse> response = matchRequestService.getStudentRequests("student@test.com");
+
+                assertThat(response).isNotNull().isEmpty();
+        }
+
+        @Test
+        void getTutorRequests_noRequests_returnsEmptyList() {
+                mockTutor("tutor@test.com");
+
+                when(matchRequestRepository.findByTutor_TutorId(20L))
+                                .thenReturn(List.of());
+
+                List<MatchRequestResponse> response = matchRequestService.getTutorRequests("tutor@test.com");
+
+                assertThat(response).isNotNull().isEmpty();
+        }
+
+        @Test
+        void cancelRequest_requestNotFound() {
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> matchRequestService.cancelRequest("student@test.com", 100L))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("Match request not found");
+        }
+
+        @Test
+        void connectStudent_requestNotFound() {
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> matchRequestService.connectStudent("tutor@test.com", 100L))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("Match request not found");
+        }
+
+        @Test
+        void partiallyFinalize_requestNotFound() {
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.empty());
+
+                TutorActionRequest action = TutorActionRequest.builder()
+                                .acceptedSubjectIds(List.of(1L))
+                                .build();
+
+                assertThatThrownBy(() -> matchRequestService.partiallyFinalize(
+                                "tutor@test.com", 100L, action))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("Match request not found");
+        }
+
+        @Test
+        void finalizeRequest_requestNotFound() {
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> matchRequestService.finalizeRequest("tutor@test.com", 100L))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("Match request not found");
+        }
+
+        @Test
+        void partiallyFinalize_acceptsSelectedSubjectsAndRejectsOthers() {
+                MatchRequest request = createRequestEntity(MatchRequestStatus.CONNECTED);
+
+                MatchRequestSubject mathRequest = createRequestSubject(
+                                request, math, SubjectRequestStatus.REQUESTED);
+
+                MatchRequestSubject physicsRequest = createRequestSubject(
+                                request, physics, SubjectRequestStatus.REQUESTED);
+
+                Subject chemistry = Subject.builder()
+                                .id(3L)
+                                .name("Chemistry")
+                                .build();
+
+                MatchRequestSubject chemistryRequest = createRequestSubject(
+                                request, chemistry, SubjectRequestStatus.REQUESTED);
+
+                request.setRequestedSubjects(new ArrayList<>(List.of(
+                                mathRequest, physicsRequest, chemistryRequest)));
+
+                mockTutor("tutor@test.com");
+
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.of(request));
+
+                mockTutorResponse();
+
+                TutorActionRequest action = TutorActionRequest.builder()
+                                .acceptedSubjectIds(List.of(1L, 3L))
+                                .build();
+
+                MatchRequestResponse response = matchRequestService.partiallyFinalize(
+                                "tutor@test.com", 100L, action);
+
+                assertThat(response.getStatus())
+                                .isEqualTo(MatchRequestStatus.PARTIALLY_FINALIZED);
+
+                assertThat(mathRequest.getStatus())
+                                .isEqualTo(SubjectRequestStatus.ACCEPTED);
+
+                assertThat(physicsRequest.getStatus())
+                                .isEqualTo(SubjectRequestStatus.REJECTED);
+
+                assertThat(chemistryRequest.getStatus())
+                                .isEqualTo(SubjectRequestStatus.ACCEPTED);
+
+                verify(matchRequestRepository).save(request);
+        }
+
+        @Test
+        void completeWorkflow_createConnectPartiallyFinalizeAndFinalize() {
+                // 1. Student creates a request for Mathematics and Physics.
+                mockStudent("student@test.com");
+
+                List<TutorTeachingPreference> preferences = List.of(
+                                createPreference(1L, tutor, board, classLevel, math),
+                                createPreference(2L, tutor, board, classLevel, physics));
+
+                when(tutorRepository.findById(20L))
+                                .thenReturn(Optional.of(tutor));
+
+                mockActiveRequestCheck(false);
+
+                when(tutorTeachingPreferenceRepository.findByTutor_TutorId(20L))
+                                .thenReturn(preferences);
+
+                when(subjectRepository.findById(1L))
+                                .thenReturn(Optional.of(math));
+
+                when(subjectRepository.findById(2L))
+                                .thenReturn(Optional.of(physics));
+
+                // Simulate database ID generation when the request is saved.
+                when(matchRequestRepository.save(any(MatchRequest.class)))
+                                .thenAnswer(invocation -> {
+                                        MatchRequest saved = invocation.getArgument(0);
+                                        saved.setRequestId(100L);
+                                        return saved;
+                                });
+
+                CreateMatchRequest createRequest = CreateMatchRequest.builder()
+                                .tutorId(20L)
+                                .subjectIds(List.of(1L, 2L))
+                                .message("Need Mathematics and Physics tuition")
+                                .build();
+
+                mockStudentResponse();
+
+                MatchRequestResponse created = matchRequestService.createRequest(
+                                "student@test.com", createRequest);
+
+                assertThat(created.getRequestId()).isEqualTo(100L);
+                assertThat(created.getStatus()).isEqualTo(MatchRequestStatus.REQUESTED);
+
+                // Retrieve the actual entity created by the service.
+                org.mockito.ArgumentCaptor<MatchRequest> requestCaptor = org.mockito.ArgumentCaptor
+                                .forClass(MatchRequest.class);
+
+                verify(matchRequestRepository).save(requestCaptor.capture());
+
+                MatchRequest persistedRequest = requestCaptor.getValue();
+
+                assertThat(persistedRequest.getRequestedSubjects())
+                                .hasSize(2);
+
+                // 2. Both parties can see the request.
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.of(persistedRequest));
+
+                when(matchRequestRepository.findByStudent_StudentId(10L))
+                                .thenReturn(List.of(persistedRequest));
+
+                when(matchRequestRepository.findByTutor_TutorId(20L))
+                                .thenReturn(List.of(persistedRequest));
+
+                // Mock both users before retrieving their requests.
+                mockStudent("student@test.com");
+                mockTutor("tutor@test.com");
+
+                mockStudentResponse();
+                mockTutorResponse();
+
+                assertThat(matchRequestService.getStudentRequests("student@test.com"))
+                                .hasSize(1);
+
+                assertThat(matchRequestService.getTutorRequests("tutor@test.com"))
+                                .hasSize(1);
+
+                // 3. Tutor connects to the student.
+                mockTutor("tutor@test.com");
+
+                MatchRequestResponse connected = matchRequestService.connectStudent(
+                                "tutor@test.com", 100L);
+
+                assertThat(connected.getStatus())
+                                .isEqualTo(MatchRequestStatus.CONNECTED);
+
+                assertThat(persistedRequest.getConnectedAt()).isNotNull();
+
+                // 4. Tutor accepts Mathematics and rejects Physics.
+                TutorActionRequest action = TutorActionRequest.builder()
+                                .acceptedSubjectIds(List.of(1L))
+                                .build();
+
+                MatchRequestResponse partiallyFinalized = matchRequestService.partiallyFinalize(
+                                "tutor@test.com", 100L, action);
+
+                assertThat(partiallyFinalized.getStatus())
+                                .isEqualTo(MatchRequestStatus.PARTIALLY_FINALIZED);
+
+                assertThat(persistedRequest.getRequestedSubjects())
+                                .filteredOn(s -> s.getSubject().getId().equals(1L))
+                                .singleElement()
+                                .extracting(MatchRequestSubject::getStatus)
+                                .isEqualTo(SubjectRequestStatus.ACCEPTED);
+
+                assertThat(persistedRequest.getRequestedSubjects())
+                                .filteredOn(s -> s.getSubject().getId().equals(2L))
+                                .singleElement()
+                                .extracting(MatchRequestSubject::getStatus)
+                                .isEqualTo(SubjectRequestStatus.REJECTED);
+
+                // 5. Tutor finalizes the match.
+                MatchRequestResponse finalized = matchRequestService.finalizeRequest(
+                                "tutor@test.com", 100L);
+
+                assertThat(finalized.getStatus())
+                                .isEqualTo(MatchRequestStatus.FINALIZED);
+
+                assertThat(persistedRequest.getStatus())
+                                .isEqualTo(MatchRequestStatus.FINALIZED);
+
+                assertThat(persistedRequest.getFinalizedAt()).isNotNull();
+
+                assertThat(persistedRequest.getRequestedSubjects())
+                                .filteredOn(s -> s.getSubject().getId().equals(1L))
+                                .singleElement()
+                                .extracting(MatchRequestSubject::getStatus)
+                                .isEqualTo(SubjectRequestStatus.FINALIZED);
+
+                // Rejected subjects must remain rejected after finalization.
+                assertThat(persistedRequest.getRequestedSubjects())
+                                .filteredOn(s -> s.getSubject().getId().equals(2L))
+                                .singleElement()
+                                .extracting(MatchRequestSubject::getStatus)
+                                .isEqualTo(SubjectRequestStatus.REJECTED);
+
+                verify(matchRequestRepository, org.mockito.Mockito.atLeast(3))
+                                .save(persistedRequest);
+        }
+
+        @Test
+        void createRequest_nullSubjectIds_throwsBadRequest() {
+                mockStudent("student@test.com");
+
+                CreateMatchRequest request = CreateMatchRequest.builder()
+                                .tutorId(20L)
+                                .subjectIds(null)
+                                .build();
+
+                when(tutorRepository.findById(20L))
+                                .thenReturn(Optional.of(tutor));
+
+                assertThatThrownBy(() -> matchRequestService.createRequest("student@test.com", request))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessageContaining("At least one subject is required");
+
+                verify(matchRequestRepository, never()).save(any(MatchRequest.class));
+        }
+
+        @Test
+        void createRequest_nullSubjectId_throwsBadRequest() {
+                mockStudent("student@test.com");
+
+                CreateMatchRequest request = CreateMatchRequest.builder()
+                                .tutorId(20L)
+                                .subjectIds(Arrays.asList(1L, null))
+                                .build();
+
+                when(tutorRepository.findById(20L))
+                                .thenReturn(Optional.of(tutor));
+
+                assertThatThrownBy(() -> matchRequestService.createRequest("student@test.com", request))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessageContaining("null values");
+
+                verify(matchRequestRepository, never()).save(any(MatchRequest.class));
+        }
+
+        @Test
+        void getRequestDetails_unrelatedUser_isDenied() {
+                MatchRequest request = createRequestEntity(
+                                MatchRequestStatus.REQUESTED);
+
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.of(request));
+
+                assertThatThrownBy(() -> matchRequestService.getRequestDetails("other@test.com", 100L))
+                                .isInstanceOf(AccessDeniedException.class)
+                                .hasMessageContaining("not allowed to view");
+        }
+
+        @Test
+        void cancelRequest_wrongStudent_doesNotSaveRequest() {
+                MatchRequest request = createRequestEntity(
+                                MatchRequestStatus.REQUESTED);
+
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.of(request));
+
+                assertThatThrownBy(() -> matchRequestService.cancelRequest("other@test.com", 100L))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessageContaining("not allowed to modify");
+
+                verify(matchRequestRepository, never()).save(any(MatchRequest.class));
+        }
+
+        @Test
+        void connectStudent_wrongTutor_doesNotSaveRequest() {
+                MatchRequest request = createRequestEntity(
+                                MatchRequestStatus.REQUESTED);
+
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.of(request));
+
+                assertThatThrownBy(() -> matchRequestService.connectStudent("other@test.com", 100L))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessageContaining("not allowed to modify");
+
+                verify(matchRequestRepository, never()).save(any(MatchRequest.class));
+        }
+
+        @Test
+        void partiallyFinalize_nullAcceptedSubjectIds_throwsBadRequest() {
+                MatchRequest request = createRequestEntity(
+                                MatchRequestStatus.CONNECTED);
+
+                request.setRequestedSubjects(new ArrayList<>(List.of(
+                                createRequestSubject(
+                                                request, math, SubjectRequestStatus.REQUESTED))));
+
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.of(request));
+
+                TutorActionRequest action = TutorActionRequest.builder()
+                                .acceptedSubjectIds(null)
+                                .build();
+
+                assertThatThrownBy(() -> matchRequestService.partiallyFinalize(
+                                "tutor@test.com", 100L, action))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessageContaining("At least one subject must be accepted");
+
+                verify(matchRequestRepository, never()).save(any(MatchRequest.class));
+        }
+
+        @Test
+        void partiallyFinalize_noAcceptedSubjects_throwsBadRequest() {
+                MatchRequest request = createRequestEntity(MatchRequestStatus.CONNECTED);
+
+                Subject subject = new Subject();
+                subject.setId(1L);
+
+                MatchRequestSubject requestSubject = createRequestSubject(request, subject,
+                                SubjectRequestStatus.REQUESTED);
+
+                request.setRequestedSubjects(new ArrayList<>(List.of(requestSubject)));
+
+                TutorActionRequest action = TutorActionRequest.builder()
+                                .acceptedSubjectIds(Collections.emptyList())
+                                .build();
+
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.of(request));
+
+                assertThatThrownBy(() -> matchRequestService.partiallyFinalize("tutor@test.com", 100L, action))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessageContaining("At least one subject must be accepted");
+
+                assertThat(request.getStatus()).isEqualTo(MatchRequestStatus.CONNECTED);
+                assertThat(requestSubject.getStatus()).isEqualTo(SubjectRequestStatus.REQUESTED);
+
+                verify(matchRequestRepository, never()).save(any(MatchRequest.class));
+        }
+
+        @Test
+        void partiallyFinalize_nullAction_throwsBadRequest() {
+                MatchRequest request = createRequestEntity(
+                                MatchRequestStatus.CONNECTED);
+
+                request.setRequestedSubjects(new ArrayList<>(List.of(
+                                createRequestSubject(
+                                                request, math, SubjectRequestStatus.REQUESTED))));
+
+                when(matchRequestRepository.findById(100L))
+                                .thenReturn(Optional.of(request));
+
+                assertThatThrownBy(() -> matchRequestService.partiallyFinalize(
+                                "tutor@test.com", 100L, null))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessage("Tutor action is required.");
+
+                verify(matchRequestRepository, never())
+                                .save(any(MatchRequest.class));
+        }
+
+        @Test
+        void validateTutorEligibility_nullVerificationStatus_throwsBadRequestException() {
+                Tutor tutorWithoutVerificationStatus = Tutor.builder()
+                                .tutorId(30L)
+                                .user(tutorUser)
+                                .verificationStatus(null)
+                                .build();
+
+                assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                                matchRequestService,
+                                "validateTutorEligibility",
+                                tutorWithoutVerificationStatus))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessage("Tutor verification status is not available.");
+        }
+
+        @Test
+        void validateAcceptedSubjectIds_nullList_throwsBadRequestException() {
+                MatchRequest request = createRequestEntity(
+                                MatchRequestStatus.CONNECTED);
+
+                assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                                matchRequestService,
+                                "validateAcceptedSubjectIds",
+                                request,
+                                null))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessage("At least one subject must be accepted.");
+        }
+
+        @Test
+        void validateAcceptedSubjectIds_listContainingNull_throwsBadRequestException() {
+                MatchRequest request = createRequestEntity(
+                                MatchRequestStatus.CONNECTED);
+
+                List<Long> acceptedSubjectIds = Arrays.asList(1L, null);
+
+                assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                                matchRequestService,
+                                "validateAcceptedSubjectIds",
+                                request,
+                                acceptedSubjectIds))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessage("Accepted subject IDs must not contain null values.");
+        }
+
 }
