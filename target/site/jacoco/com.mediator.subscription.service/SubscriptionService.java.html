@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.subscription.service</a> &gt; <span class="el_source">SubscriptionService.java</span></div><h1>SubscriptionService.java</h1><pre class="source lang-java linenums">package com.mediator.subscription.service;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.mediator.auth.entity.User;
+import com.mediator.auth.repository.UserRepository;
+import com.mediator.common.exception.ResourceNotFoundException;
+import com.mediator.common.exception.BadRequestException;
+import com.mediator.subscription.dto.request.CreateSubscriptionRequest;
+import com.mediator.subscription.dto.response.SubscriptionPlanResponse;
+import com.mediator.subscription.dto.response.SubscriptionResponse;
+import com.mediator.subscription.entity.Subscription;
+import com.mediator.subscription.entity.SubscriptionPlan;
+import com.mediator.subscription.entity.SubscriptionStatus;
+import com.mediator.subscription.mapper.SubscriptionMapper;
+import com.mediator.subscription.mapper.SubscriptionPlanMapper;
+import com.mediator.subscription.repository.SubscriptionPlanRepository;
+import com.mediator.subscription.repository.SubscriptionRepository;
+import com.mediator.tutor.entity.Tutor;
+import com.mediator.tutor.entity.VerificationStatus;
+import com.mediator.tutor.repository.TutorRepository;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class SubscriptionService {
+
+    private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final TutorRepository tutorRepository;
+    private final UserRepository userRepository;
+    private final SubscriptionMapper subscriptionMapper;
+    private final SubscriptionPlanMapper subscriptionPlanMapper;
+
+    @Transactional(readOnly = true)
+    public List&lt;SubscriptionPlanResponse&gt; getAvailablePlans() {
+
+<span class="fc" id="L46">        return subscriptionPlanRepository.findAll()</span>
+<span class="fc" id="L47">                .stream()</span>
+<span class="fc" id="L48">                .filter(SubscriptionPlan::getActive)</span>
+<span class="fc" id="L49">                .map(subscriptionPlanMapper::toResponse)</span>
+<span class="fc" id="L50">                .toList();</span>
+    }
+
+    /**
+     * Generates internal transaction id.
+     *
+     * Example:
+     * TXN-20260712-A83KQ9
+     */
+    private String generateTransactionId() {
+
+<span class="fc" id="L61">        String random = UUID.randomUUID()</span>
+<span class="fc" id="L62">                .toString()</span>
+<span class="fc" id="L63">                .replace(&quot;-&quot;, &quot;&quot;)</span>
+<span class="fc" id="L64">                .substring(0, 6)</span>
+<span class="fc" id="L65">                .toUpperCase();</span>
+
+<span class="fc" id="L67">        return &quot;TXN-&quot;</span>
+<span class="fc" id="L68">                + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)</span>
+                + &quot;-&quot;
+                + random;
+    }
+
+    private LocalDate calculateEndDate(
+            SubscriptionPlan plan) {
+
+<span class="fc" id="L76">        return LocalDate.now()</span>
+<span class="fc" id="L77">                .plusMonths(plan.getDurationInMonths());</span>
+    }
+
+    public SubscriptionResponse createSubscription(
+            String email,
+            CreateSubscriptionRequest request) {
+
+<span class="fc" id="L84">        Tutor tutor = getTutorByEmail(email);</span>
+
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (tutor.getVerificationStatus() != VerificationStatus.APPROVED) {</span>
+
+<span class="fc" id="L88">            throw new BadRequestException(</span>
+                    &quot;Your profile must be verified before purchasing a subscription.&quot;);
+        }
+
+<span class="fc" id="L92">        subscriptionRepository</span>
+<span class="fc" id="L93">                .findByTutor_TutorIdAndStatus(</span>
+<span class="fc" id="L94">                        tutor.getTutorId(),</span>
+                        SubscriptionStatus.ACTIVE)
+<span class="fc" id="L96">                .ifPresent(subscription -&gt; {</span>
+
+<span class="fc" id="L98">                    throw new BadRequestException(</span>
+                            &quot;An active subscription already exists.&quot;);
+                });
+
+<span class="fc" id="L102">        SubscriptionPlan plan = subscriptionPlanRepository</span>
+<span class="fc" id="L103">                .findByPlanTypeAndActiveTrue(</span>
+<span class="fc" id="L104">                        request.getPlanType())</span>
+<span class="fc" id="L105">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                        &quot;Subscription plan not found.&quot;));
+
+<span class="fc" id="L108">        Subscription subscription = Subscription.builder()</span>
+
+<span class="fc" id="L110">                .tutor(tutor)</span>
+
+<span class="fc" id="L112">                .subscriptionPlan(plan)</span>
+
+<span class="fc" id="L114">                .startDate(LocalDate.now())</span>
+
+<span class="fc" id="L116">                .endDate(calculateEndDate(plan))</span>
+
+<span class="fc" id="L118">                .transactionId(generateTransactionId())</span>
+
+<span class="fc" id="L120">                .status(SubscriptionStatus.ACTIVE)</span>
+
+<span class="fc" id="L122">                .build();</span>
+
+<span class="fc" id="L124">        Subscription savedSubscription = subscriptionRepository.save(subscription);</span>
+
+<span class="fc" id="L126">        return subscriptionMapper.toResponse(savedSubscription);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public SubscriptionResponse getCurrentSubscription(
+            String email) {
+
+<span class="fc" id="L133">        Tutor tutor = getTutorByEmail(email);</span>
+
+<span class="fc" id="L135">        Subscription subscription = subscriptionRepository</span>
+<span class="fc" id="L136">                .findByTutor_TutorIdAndStatus(</span>
+<span class="fc" id="L137">                        tutor.getTutorId(),</span>
+                        SubscriptionStatus.ACTIVE)
+<span class="fc" id="L139">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                        &quot;No active subscription found.&quot;));
+
+<span class="fc" id="L142">        return subscriptionMapper.toResponse(subscription);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public List&lt;SubscriptionResponse&gt; getSubscriptionHistory(
+            String email) {
+
+<span class="fc" id="L149">        Tutor tutor = getTutorByEmail(email);</span>
+
+<span class="fc" id="L151">        return subscriptionRepository</span>
+<span class="fc" id="L152">                .findAllByTutor_TutorIdOrderByEndDateDesc(</span>
+<span class="fc" id="L153">                        tutor.getTutorId())</span>
+<span class="fc" id="L154">                .stream()</span>
+<span class="fc" id="L155">                .map(subscriptionMapper::toResponse)</span>
+<span class="fc" id="L156">                .toList();</span>
+    }
+
+    private Tutor getTutorByEmail(String email) {
+
+<span class="fc" id="L161">        User user = userRepository.findByEmail(email)</span>
+<span class="fc" id="L162">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;User not found.&quot;));</span>
+
+<span class="fc" id="L164">        return tutorRepository.findByUser(user)</span>
+<span class="fc" id="L165">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Tutor profile not found.&quot;));</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

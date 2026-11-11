@@ -8,15 +8,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.mediator.common.exception.ResourceNotFoundException;
+import com.mediator.master.dto.SubjectResponse;
 import com.mediator.master.entity.Board;
 import com.mediator.master.entity.ClassLevel;
 import com.mediator.master.entity.Subject;
 import com.mediator.master.repository.BoardRepository;
 import com.mediator.master.repository.ClassLevelRepository;
 import com.mediator.master.repository.SubjectRepository;
+import com.mediator.student.dto.preference.StudentPreferenceDto;
 import com.mediator.student.dto.request.StudentProfileRequest;
 import com.mediator.student.dto.dashboard.StudentDashboardResponse;
 import com.mediator.student.dto.response.StudentProfileResponse;
+
 import com.mediator.student.entity.ContactOwner;
 import com.mediator.student.entity.Student;
 import com.mediator.student.entity.StudentPreference;
@@ -51,10 +54,12 @@ public class StudentService {
 
         Student student = getLoggedInStudent();
 
-        List<StudentPreference> preferences = studentPreferenceRepository.findByStudent_StudentId(
-                student.getStudentId());
+        List<StudentPreference> preferences =
+                studentPreferenceRepository.findByStudent_StudentId(
+                        student.getStudentId());
 
-        Integer completion = calculateProfileCompletion(student, preferences);
+        Integer completion =
+                calculateProfileCompletion(student, preferences);
 
         return studentMapper.toResponse(
                 student,
@@ -63,17 +68,12 @@ public class StudentService {
     }
 
     /**
-     * Dashboard API.
+     * Dashboard.
      */
     @Transactional(readOnly = true)
     public StudentDashboardResponse getDashboard() {
 
         StudentProfileResponse profile = getProfile();
-
-        /*
-         * Match module isn't implemented yet.
-         * Keeping these values as zero.
-         */
 
         return StudentDashboardResponse.builder()
                 .profile(profile)
@@ -85,48 +85,29 @@ public class StudentService {
     }
 
     /**
-     * Returns currently authenticated student.
+     * Update student profile.
      */
-    private Student getLoggedInStudent() {
-
-        Authentication authentication = SecurityContextHolder
-                .getContext()
-                .getAuthentication();
-
-        String email = authentication.getName();
-
-        return studentRepository
-                .findByUserEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Student profile not found."));
-    }
-
-    /**
-     * Updates student's profile.
-     */
-    public StudentProfileResponse updateProfile(StudentProfileRequest request) {
+    @Transactional
+    public StudentProfileResponse updateProfile(
+            StudentProfileRequest request) {
 
         Student student = getLoggedInStudent();
 
-        /*
-         * Validate Board
-         */
-        Board board = boardRepository.findById(request.getBoardId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Board not found with id : "
-                                + request.getBoardId()));
+        Board board = boardRepository.findById(
+                request.getBoardId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Board not found with id : "
+                                        + request.getBoardId()));
 
-        /*
-         * Validate Class
-         */
-        ClassLevel classLevel = classLevelRepository.findById(request.getClassLevelId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Class Level not found with id : "
-                                + request.getClassLevelId()));
+        ClassLevel classLevel =
+                classLevelRepository.findById(
+                        request.getClassLevelId())
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Class Level not found with id : "
+                                                + request.getClassLevelId()));
 
-        /*
-         * Update Student Entity
-         */
         studentMapper.updateStudentEntity(
                 student,
                 request,
@@ -134,7 +115,7 @@ public class StudentService {
                 classLevel);
 
         /*
-         * Handle Parent Phone
+         * Parent Phone
          */
         if (Boolean.TRUE.equals(request.getSameAsPrimaryPhone())) {
 
@@ -145,13 +126,14 @@ public class StudentService {
 
         } else {
 
-            student.setParentPhone(request.getParentPhone());
+            student.setParentPhone(
+                    request.getParentPhone());
 
             student.setPrimaryMobileOwner(ContactOwner.PARENT);
         }
 
         /*
-         * Handle Parent Email
+         * Parent Email
          */
         if (Boolean.TRUE.equals(request.getSameAsPrimaryEmail())) {
 
@@ -162,32 +144,22 @@ public class StudentService {
 
         } else {
 
-            student.setParentEmail(request.getParentEmail());
+            student.setParentEmail(
+                    request.getParentEmail());
 
             student.setPrimaryEmailOwner(ContactOwner.PARENT);
         }
 
-        /*
-         * Save Student
-         */
         studentRepository.save(student);
 
-        /*
-         * Replace Subject Preferences
-         */
-        replaceStudentSubjects(
-                student,
-                request.getSubjectIds());
+        List<StudentPreference> preferences =
+                studentPreferenceRepository.findByStudent_StudentId(
+                        student.getStudentId());
 
-        /*
-         * Return Updated Profile
-         */
-        List<StudentPreference> preferences = studentPreferenceRepository.findByStudent_StudentId(
-                student.getStudentId());
-
-        Integer completion = calculateProfileCompletion(
-                student,
-                preferences);
+        Integer completion =
+                calculateProfileCompletion(
+                        student,
+                        preferences);
 
         return studentMapper.toResponse(
                 student,
@@ -196,7 +168,63 @@ public class StudentService {
     }
 
     /**
-     * Replaces student's preferred subjects.
+     * Update preferred subjects.
+     */
+    public List<SubjectResponse> updatePreferences(
+            StudentPreferenceDto request) {
+
+        Student student = getLoggedInStudent();
+
+        List<Subject> subjects =
+                loadSubjects(request.getSubjectIds());
+
+        replaceStudentSubjects(
+                student,
+                request.getSubjectIds());
+
+        return subjects.stream()
+                .map(studentMapper::toSubjectResponse)
+                .toList();
+    }
+
+    /**
+     * Get preferred subjects.
+     */
+    @Transactional(readOnly = true)
+    public List<SubjectResponse> getPreferences() {
+
+        Student student = getLoggedInStudent();
+
+        return studentPreferenceRepository
+                .findByStudent_StudentId(
+                        student.getStudentId())
+                .stream()
+                .map(StudentPreference::getSubject)
+                .map(studentMapper::toSubjectResponse)
+                .toList();
+    }
+
+    /**
+     * Returns logged in student.
+     */
+    private Student getLoggedInStudent() {
+
+        Authentication authentication =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication();
+
+        String email = authentication.getName();
+
+        return studentRepository
+                .findByUserEmail(email)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Student profile not found."));
+    }
+
+    /**
+     * Replace all preferred subjects.
      */
     private void replaceStudentSubjects(
             Student student,
@@ -208,33 +236,67 @@ public class StudentService {
             return;
         }
 
-        List<Subject> subjects = loadSubjects(subjectIds);
+        List<Subject> subjects =
+                loadSubjects(subjectIds);
 
-        List<StudentPreference> preferences = subjects.stream()
-                .map(subject -> {
+        List<StudentPreference> preferences =
+                subjects.stream()
+                        .map(subject -> {
 
-                    StudentPreference preference = new StudentPreference();
+                            StudentPreference preference =
+                                    new StudentPreference();
 
-                    preference.setStudent(student);
+                            preference.setStudent(student);
 
-                    preference.setSubject(subject);
+                            preference.setSubject(subject);
 
-                    return preference;
+                            return preference;
 
-                })
-                .toList();
+                        })
+                        .toList();
 
         studentPreferenceRepository.saveAll(preferences);
     }
 
     /**
-     * Calculates profile completion percentage.
+     * Load subjects.
+     */
+    private List<Subject> loadSubjects(
+            List<Long> subjectIds) {
+
+        List<Subject> subjects =
+                subjectRepository.findAllById(subjectIds);
+
+        validateSubjects(
+                subjectIds,
+                subjects);
+
+        return subjects;
+    }
+
+    /**
+     * Validate subjects.
+     */
+    private void validateSubjects(
+            List<Long> requestedIds,
+            List<Subject> subjects) {
+
+        if (requestedIds.size() != subjects.size()) {
+
+            throw new ResourceNotFoundException(
+                    "One or more selected subjects do not exist.");
+        }
+    }
+
+    /**
+     * Calculate profile completion.
      */
     private Integer calculateProfileCompletion(
             Student student,
             List<StudentPreference> preferences) {
 
         int completed = 0;
+
         final int totalFields = 11;
 
         if (student.getGender() != null)
@@ -271,35 +333,10 @@ public class StudentService {
                 !student.getParentEmail().isBlank())
             completed++;
 
-        if (preferences != null && !preferences.isEmpty())
+        if (preferences != null &&
+                !preferences.isEmpty())
             completed++;
 
         return (completed * 100) / totalFields;
-    }
-
-    /**
-     * Loads all subjects from database.
-     */
-    private List<Subject> loadSubjects(List<Long> subjectIds) {
-
-        List<Subject> subjects = subjectRepository.findAllById(subjectIds);
-
-        validateSubjects(subjectIds, subjects);
-
-        return subjects;
-    }
-
-    /**
-     * Validates requested subjects.
-     */
-    private void validateSubjects(
-            List<Long> requestedIds,
-            List<Subject> subjects) {
-
-        if (requestedIds.size() != subjects.size()) {
-
-            throw new ResourceNotFoundException(
-                    "One or more selected subjects do not exist.");
-        }
     }
 }

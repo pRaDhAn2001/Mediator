@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TutorMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.tutor.mapper</a> &gt; <span class="el_source">TutorMapper.java</span></div><h1>TutorMapper.java</h1><pre class="source lang-java linenums">package com.mediator.tutor.mapper;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Component;
+
+import com.mediator.common.mapper.AddressMapper;
+import com.mediator.common.mapper.PreferredModeMapper;
+import com.mediator.tutor.dto.document.TutorDocumentDto;
+import com.mediator.tutor.dto.preference.TutorTeachingPreferenceDto;
+import com.mediator.tutor.dto.request.TutorProfileRequest;
+import com.mediator.tutor.dto.response.TutorProfileResponse;
+import com.mediator.tutor.entity.Tutor;
+import com.mediator.tutor.entity.TutorDocument;
+import com.mediator.tutor.entity.TutorTeachingPreference;
+
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+
+@Component
+@Getter
+@Setter
+@RequiredArgsConstructor
+public class TutorMapper {
+
+        private final AddressMapper addressMapper;
+
+        private final PreferredModeMapper preferredModeMapper;
+
+        private final AcademicProfileMapper academicProfileMapper;
+
+        /**
+         * Request DTO -&gt; Entity
+         */
+        public void updateTutorEntity(
+                        Tutor tutor,
+                        TutorProfileRequest request) {
+
+<span class="fc" id="L41">                tutor.setGender(request.getGender());</span>
+
+<span class="fc" id="L43">                tutor.setDescription(request.getDescription());</span>
+
+<span class="fc" id="L45">                tutor.setAddress(</span>
+<span class="fc" id="L46">                                addressMapper.toEntity(</span>
+<span class="fc" id="L47">                                                request.getAddress()));</span>
+
+<span class="fc" id="L49">                tutor.setAcademicProfile(</span>
+<span class="fc" id="L50">                                academicProfileMapper.toEntity(</span>
+<span class="fc" id="L51">                                                request.getAcademicProfile()));</span>
+
+<span class="fc" id="L53">                tutor.setTeachingExperienceYears(</span>
+<span class="fc" id="L54">                                request.getTeachingExperienceYears());</span>
+
+<span class="fc" id="L56">                tutor.setIndustryExperienceYears(</span>
+<span class="fc" id="L57">                                request.getIndustryExperienceYears());</span>
+
+<span class="fc" id="L59">                tutor.setCurrentOccupation(</span>
+<span class="fc" id="L60">                                request.getCurrentOccupation());</span>
+
+<span class="fc" id="L62">                tutor.setPreferredMode(</span>
+<span class="fc" id="L63">                                preferredModeMapper.toEntity(</span>
+<span class="fc" id="L64">                                                request.getPreferredMode()));</span>
+
+<span class="fc" id="L66">                tutor.setPreferredRadius(</span>
+<span class="fc" id="L67">                                request.getPreferredRadius());</span>
+
+<span class="fc" id="L69">                tutor.setSalaryMin(</span>
+<span class="fc" id="L70">                                request.getSalaryMin());</span>
+
+<span class="fc" id="L72">                tutor.setSalaryMax(</span>
+<span class="fc" id="L73">                                request.getSalaryMax());</span>
+
+<span class="fc" id="L75">                tutor.setDemoVideoUrl(</span>
+<span class="fc" id="L76">                                request.getDemoVideoUrl());</span>
+<span class="fc" id="L77">        }</span>
+
+        /**
+         * Entity -&gt; Response DTO
+         */
+        public TutorProfileResponse toResponse(
+                        Tutor tutor,
+                        Integer profileCompletion,
+                        List&lt;TutorDocument&gt; documents) {
+
+<span class="fc" id="L87">                return TutorProfileResponse.builder()</span>
+
+<span class="fc" id="L89">                                .tutorId(tutor.getTutorId())</span>
+
+<span class="fc" id="L91">                                .firstName(tutor.getUser().getFirstName())</span>
+
+<span class="fc" id="L93">                                .lastName(tutor.getUser().getLastName())</span>
+
+<span class="fc" id="L95">                                .email(tutor.getUser().getEmail())</span>
+
+<span class="fc" id="L97">                                .mobileNumber(tutor.getUser().getMobileNumber())</span>
+
+<span class="fc" id="L99">                                .gender(tutor.getGender())</span>
+
+<span class="fc" id="L101">                                .description(tutor.getDescription())</span>
+
+<span class="fc" id="L103">                                .address(</span>
+<span class="fc" id="L104">                                                addressMapper.toDto(</span>
+<span class="fc" id="L105">                                                                tutor.getAddress()))</span>
+
+<span class="fc" id="L107">                                .academicProfile(</span>
+<span class="fc" id="L108">                                                academicProfileMapper.toDto(</span>
+<span class="fc" id="L109">                                                                tutor.getAcademicProfile()))</span>
+
+<span class="fc" id="L111">                                .teachingExperienceYears(</span>
+<span class="fc" id="L112">                                                tutor.getTeachingExperienceYears())</span>
+
+<span class="fc" id="L114">                                .industryExperienceYears(</span>
+<span class="fc" id="L115">                                                tutor.getIndustryExperienceYears())</span>
+
+<span class="fc" id="L117">                                .currentOccupation(</span>
+<span class="fc" id="L118">                                                tutor.getCurrentOccupation())</span>
+
+<span class="fc" id="L120">                                .preferredMode(</span>
+<span class="fc" id="L121">                                                preferredModeMapper.toDto(</span>
+<span class="fc" id="L122">                                                                tutor.getPreferredMode()))</span>
+
+<span class="fc" id="L124">                                .preferredRadius(</span>
+<span class="fc" id="L125">                                                tutor.getPreferredRadius())</span>
+
+<span class="fc" id="L127">                                .salaryMin(</span>
+<span class="fc" id="L128">                                                tutor.getSalaryMin())</span>
+
+<span class="fc" id="L130">                                .salaryMax(</span>
+<span class="fc" id="L131">                                                tutor.getSalaryMax())</span>
+
+<span class="fc" id="L133">                                .demoVideoUrl(</span>
+<span class="fc" id="L134">                                                tutor.getDemoVideoUrl())</span>
+
+<span class="fc" id="L136">                                .verificationStatus(</span>
+<span class="fc" id="L137">                                                tutor.getVerificationStatus())</span>
+
+<span class="fc" id="L139">                                .profileStatus(</span>
+<span class="fc" id="L140">                                                tutor.getProfileStatus())</span>
+
+<span class="fc" id="L142">                                .profileCompletion(</span>
+                                                profileCompletion)
+
+<span class="fc" id="L145">                                .documents(</span>
+<span class="fc" id="L146">                                                mapDocuments(documents))</span>
+
+<span class="fc" id="L148">                                .build();</span>
+        }
+
+        /**
+         * Tutor Documents
+         */
+        private List&lt;TutorDocumentDto&gt; mapDocuments(
+                        List&lt;TutorDocument&gt; documents) {
+
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                if (documents == null) {</span>
+<span class="fc" id="L158">                        return List.of();</span>
+                }
+
+<span class="fc" id="L161">                return documents.stream()</span>
+<span class="fc" id="L162">                                .map(this::toDocumentDto)</span>
+<span class="fc" id="L163">                                .collect(Collectors.toList());</span>
+        }
+
+        /**
+         * Single Document
+         */
+        private TutorDocumentDto toDocumentDto(
+                        TutorDocument document) {
+
+<span class="fc" id="L172">                return TutorDocumentDto.builder()</span>
+<span class="fc" id="L173">                                .documentType(document.getDocumentType())</span>
+<span class="fc" id="L174">                                .documentUrl(document.getDocumentUrl())</span>
+<span class="fc" id="L175">                                .build();</span>
+        }
+
+        public TutorTeachingPreferenceDto toPreferenceDto(
+                        TutorTeachingPreference preference) {
+
+<span class="fc" id="L181">                return TutorTeachingPreferenceDto.builder()</span>
+<span class="fc" id="L182">                                .subjectId(preference.getSubject().getId())</span>
+<span class="fc" id="L183">                                .classLevelId(preference.getClassLevel().getId())</span>
+<span class="fc" id="L184">                                .boardId(preference.getBoard().getId())</span>
+<span class="fc" id="L185">                                .build();</span>
+        }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

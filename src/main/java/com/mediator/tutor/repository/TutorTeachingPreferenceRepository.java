@@ -7,6 +7,8 @@ import com.mediator.tutor.entity.TutorTeachingPreference;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Modifying;
+
 @Repository
 public interface TutorTeachingPreferenceRepository
         extends JpaRepository<TutorTeachingPreference, Long> {
@@ -19,5 +21,6 @@ public interface TutorTeachingPreferenceRepository
 
     List<TutorTeachingPreference> findByBoard_Id(Long boardId);
 
+    @Modifying
     void deleteByTutor_TutorId(Long tutorId);
 }

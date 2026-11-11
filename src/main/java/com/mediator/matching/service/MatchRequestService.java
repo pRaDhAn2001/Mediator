@@ -1,6 +1,8 @@
 package com.mediator.matching.service;
 
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,7 @@ import com.mediator.tutor.repository.TutorTeachingPreferenceRepository;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -185,18 +188,17 @@ public class MatchRequestService {
                                 .getEmail()
                                 .equalsIgnoreCase(email);
 
-                if (!isStudent && !isTutor) {
-                        throw new BadRequestException(
-                                        "You are not allowed to view this match request.");
-                }
-
                 if (isTutor) {
                         return matchRequestMapper.toTutorResponse(request);
                 }
 
-                return matchRequestMapper.toStudentResponse(request);
-        }
+                if (isStudent) {
+                        return matchRequestMapper.toStudentResponse(request);
+                }
 
+                throw new AccessDeniedException(
+                                "You are not allowed to view this match request.");
+        }
         // =========================================================
         // CANCEL
         // =========================================================
@@ -273,31 +275,25 @@ public class MatchRequestService {
                                         "Partial finalization is allowed only for CONNECTED requests.");
                 }
 
-                validateAcceptedSubjectIds(
-                                request,
-                                action.getAcceptedSubjectIds());
-
-                Set<Long> acceptedIds = new HashSet<>(action.getAcceptedSubjectIds());
-
-                for (MatchRequestSubject requestSubject : request.getRequestedSubjects()) {
-
-                        Long subjectId = requestSubject.getSubject().getId();
-
-                        if (acceptedIds.contains(subjectId)) {
-
-                                requestSubject.setStatus(
-                                                SubjectRequestStatus.ACCEPTED);
-
-                        } else {
-
-                                requestSubject.setStatus(
-                                                SubjectRequestStatus.REJECTED);
-                        }
+                if (action == null) {
+                        throw new BadRequestException(
+                                        "Tutor action is required.");
                 }
+
+                List<Long> acceptedSubjectIds = action.getAcceptedSubjectIds();
+
+                if (acceptedSubjectIds == null || acceptedSubjectIds.isEmpty()) {
+                        throw new BadRequestException(
+                                        "At least one subject must be accepted.");
+                }
+
+                validateAcceptedSubjectIds(request, acceptedSubjectIds);
+
+                Set<Long> acceptedIds = new HashSet<>(acceptedSubjectIds);
 
                 long acceptedCount = request.getRequestedSubjects()
                                 .stream()
-                                .filter(subject -> subject.getStatus() == SubjectRequestStatus.ACCEPTED)
+                                .filter(subject -> acceptedIds.contains(subject.getSubject().getId()))
                                 .count();
 
                 if (acceptedCount == 0) {
@@ -305,31 +301,24 @@ public class MatchRequestService {
                                         "At least one subject must be accepted.");
                 }
 
+                for (MatchRequestSubject requestSubject : request.getRequestedSubjects()) {
+                        Long subjectId = requestSubject.getSubject().getId();
+
+                        if (acceptedIds.contains(subjectId)) {
+                                requestSubject.setStatus(SubjectRequestStatus.ACCEPTED);
+                        } else {
+                                requestSubject.setStatus(SubjectRequestStatus.REJECTED);
+                        }
+                }
+
                 if (acceptedCount == request.getRequestedSubjects().size()) {
-
-                        /*
-                         * Tutor accepted every subject.
-                         *
-                         * We can directly move to FINALIZED.
-                         */
-                        request.setStatus(
-                                        MatchRequestStatus.FINALIZED);
-
-                        request.setFinalizedAt(
-                                        LocalDateTime.now());
+                        request.setStatus(MatchRequestStatus.FINALIZED);
+                        request.setFinalizedAt(LocalDateTime.now());
 
                         request.getRequestedSubjects()
-                                        .forEach(subject -> subject.setStatus(
-                                                        SubjectRequestStatus.FINALIZED));
-
+                                        .forEach(subject -> subject.setStatus(SubjectRequestStatus.FINALIZED));
                 } else {
-
-                        /*
-                         * Some subjects accepted,
-                         * some rejected.
-                         */
-                        request.setStatus(
-                                        MatchRequestStatus.PARTIALLY_FINALIZED);
+                        request.setStatus(MatchRequestStatus.PARTIALLY_FINALIZED);
                 }
 
                 matchRequestRepository.save(request);
@@ -442,17 +431,16 @@ public class MatchRequestService {
         }
 
         private void validateSubjectIds(List<Long> subjectIds) {
-
                 if (subjectIds == null || subjectIds.isEmpty()) {
                         throw new BadRequestException(
                                         "At least one subject is required.");
                 }
 
-                /*
-                 * Prevent:
-                 *
-                 * [1, 1, 2]
-                 */
+                if (subjectIds.stream().anyMatch(Objects::isNull)) {
+                        throw new BadRequestException(
+                                        "Subject IDs must not contain null values.");
+                }
+
                 Set<Long> uniqueIds = new HashSet<>(subjectIds);
 
                 if (uniqueIds.size() != subjectIds.size()) {
@@ -554,28 +542,31 @@ public class MatchRequestService {
                         MatchRequest request,
                         List<Long> acceptedSubjectIds) {
 
-                if (acceptedSubjectIds == null
-                                || acceptedSubjectIds.isEmpty()) {
-
+                if (acceptedSubjectIds == null || acceptedSubjectIds.isEmpty()) {
                         throw new BadRequestException(
                                         "At least one subject must be accepted.");
+                }
+
+                if (acceptedSubjectIds.stream().anyMatch(Objects::isNull)) {
+                        throw new BadRequestException(
+                                        "Accepted subject IDs must not contain null values.");
                 }
 
                 Set<Long> requestedSubjectIds = request.getRequestedSubjects()
                                 .stream()
                                 .map(subject -> subject.getSubject().getId())
-                                .collect(java.util.stream.Collectors.toSet());
+                                .collect(Collectors.toSet());
 
                 Set<Long> acceptedIds = new HashSet<>(acceptedSubjectIds);
-
-                if (!requestedSubjectIds.containsAll(acceptedIds)) {
-                        throw new BadRequestException(
-                                        "Tutor can only accept subjects included in the original request.");
-                }
 
                 if (acceptedIds.size() != acceptedSubjectIds.size()) {
                         throw new BadRequestException(
                                         "Duplicate accepted subject IDs are not allowed.");
+                }
+
+                if (!requestedSubjectIds.containsAll(acceptedIds)) {
+                        throw new BadRequestException(
+                                        "Tutor can only accept subjects included in the original request.");
                 }
         }
 

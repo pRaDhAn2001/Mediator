@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.mediator.auth.AuthIntegrationTest
+-------------------------------------------------------------------------------
+Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 9.695 s -- in com.mediator.auth.AuthIntegrationTest

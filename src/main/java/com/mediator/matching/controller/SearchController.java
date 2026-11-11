@@ -13,54 +13,54 @@ import com.mediator.matching.service.MatchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import org.springframework.security.core.context.SecurityContextHolder;
+
 @RestController
 @RequestMapping("/api/v1/search")
 @RequiredArgsConstructor
 @Validated
+@Tag(name = "Tutor Search", description = "APIs for searching tutors and viewing tutor details")
 public class SearchController {
 
         private final MatchService matchService;
 
-        // ============================================================
-        // SEARCH TUTORS
-        // ============================================================
-
         @PostMapping("/tutors")
+        @Operation(summary = "Search tutors", description = "Searches for tutors based on selected subjects, board, class level, teaching mode and location preferences.")
+        @ApiResponses({
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Tutors fetched successfully"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid search criteria")
+        })
         public ResponseEntity<ApiResponse<TutorSearchResponse>> searchTutors(
                         @Valid @RequestBody TutorSearchRequest request) {
 
-                return ResponseEntity.ok(
-                                ApiResponse.success(
-                                                "Tutors fetched successfully.",
-                                                matchService.searchTutors(
-                                                                request)));
+                return ResponseEntity.ok(ApiResponse.success(
+                                "Tutors fetched successfully.",
+                                matchService.searchTutors(request)));
         }
 
-        // ============================================================
-        // GET TUTOR DETAILS
-        // ============================================================
-
         @GetMapping("/tutors/{tutorId}")
+        @Operation(summary = "Get tutor details", description = "Retrieves detailed information about a tutor for the authenticated user.", security = @SecurityRequirement(name = "Bearer Authentication"))
+        @ApiResponses({
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Tutor details fetched successfully"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Authentication required"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Tutor not found")
+        })
         public ResponseEntity<ApiResponse<TutorDetailsResponse>> getTutorDetails(
-                        @PathVariable Long tutorId) {
+                        @Parameter(description = "ID of the tutor", example = "1") @PathVariable Long tutorId) {
 
-                /*
-                 * Replace this with however your application currently
-                 * obtains the logged-in user's email.
-                 *
-                 * If your project already has SecurityContext-based
-                 * authentication, use that implementation here.
-                 */
-                String email = org.springframework.security.core.context.SecurityContextHolder
+                String email = SecurityContextHolder
                                 .getContext()
                                 .getAuthentication()
                                 .getName();
 
-                return ResponseEntity.ok(
-                                ApiResponse.success(
-                                                "Tutor details fetched successfully.",
-                                                matchService.getTutorDetails(
-                                                                email,
-                                                                tutorId)));
+                return ResponseEntity.ok(ApiResponse.success(
+                                "Tutor details fetched successfully.",
+                                matchService.getTutorDetails(email, tutorId)));
         }
 }

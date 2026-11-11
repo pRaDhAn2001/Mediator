@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatchMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.matching.mapper</a> &gt; <span class="el_source">MatchMapper.java</span></div><h1>MatchMapper.java</h1><pre class="source lang-java linenums">package com.mediator.matching.mapper;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
+import com.mediator.common.mapper.PreferredModeMapper;
+import com.mediator.matching.dto.response.TutorCardResponse;
+import com.mediator.matching.dto.response.TutorDetailsResponse;
+import com.mediator.matching.dto.response.TutorTeachingSubjectResponse;
+import com.mediator.matching.entity.MatchScore;
+import com.mediator.tutor.entity.Tutor;
+import com.mediator.tutor.entity.TutorTeachingPreference;
+
+import lombok.RequiredArgsConstructor;
+
+@Component
+@RequiredArgsConstructor
+public class MatchMapper {
+
+        private final PreferredModeMapper preferredModeMapper;
+
+        // ============================================================
+        // TUTOR CARD
+        // ============================================================
+
+        public TutorCardResponse toCard(
+                        MatchScore score,
+                        List&lt;TutorTeachingPreference&gt; preferences) {
+
+<span class="fc" id="L32">                Tutor tutor = score.getTutor();</span>
+
+<span class="fc" id="L34">                List&lt;String&gt; subjects = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L36" title="All 2 branches covered.">                if (preferences != null) {</span>
+
+<span class="fc bfc" id="L38" title="All 2 branches covered.">                        for (TutorTeachingPreference preference : preferences) {</span>
+
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                                if (preference.getSubject() != null</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">                                                &amp;&amp; preference.getSubject().getName() != null) {</span>
+
+<span class="fc" id="L43">                                        String subjectName = preference.getSubject().getName();</span>
+
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                                        if (!subjects.contains(subjectName)) {</span>
+<span class="fc" id="L46">                                                subjects.add(subjectName);</span>
+                                        }
+                                }
+<span class="fc" id="L49">                        }</span>
+                }
+
+<span class="fc" id="L52">                return TutorCardResponse.builder()</span>
+<span class="fc" id="L53">                                .tutorId(tutor.getTutorId())</span>
+
+<span class="fc" id="L55">                                .firstName(</span>
+<span class="fc" id="L56">                                                tutor.getUser().getFirstName())</span>
+
+<span class="fc" id="L58">                                .lastName(</span>
+<span class="fc" id="L59">                                                tutor.getUser().getLastName())</span>
+
+<span class="fc" id="L61">                                .highestQualification(</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                                                tutor.getAcademicProfile() != null</span>
+<span class="fc" id="L63">                                                                ? tutor.getAcademicProfile()</span>
+<span class="fc" id="L64">                                                                                .getHighestQualification()</span>
+<span class="fc" id="L65">                                                                : null)</span>
+
+<span class="fc" id="L67">                                .teachingExperienceYears(</span>
+<span class="fc" id="L68">                                                tutor.getTeachingExperienceYears())</span>
+
+<span class="fc" id="L70">                                .subjects(subjects)</span>
+
+<span class="fc" id="L72">                                .matchedSubjects(</span>
+<span class="fc" id="L73">                                                score.getMatchedSubjects())</span>
+
+<span class="fc" id="L75">                                .totalRequestedSubjects(</span>
+<span class="fc" id="L76">                                                score.getTotalRequestedSubjects())</span>
+
+<span class="fc" id="L78">                                .matchPercentage(</span>
+<span class="fc" id="L79">                                                score.getMatchPercentage())</span>
+
+<span class="fc" id="L81">                                .distance(</span>
+<span class="fc" id="L82">                                                score.getDistance())</span>
+
+<span class="fc" id="L84">                                .build();</span>
+        }
+
+        // ============================================================
+        // TUTOR DETAILS
+        // ============================================================
+
+        public TutorDetailsResponse toDetails(
+                        Tutor tutor,
+                        Double distance,
+                        List&lt;TutorTeachingPreference&gt; preferences) {
+
+<span class="fc" id="L96">                List&lt;TutorTeachingSubjectResponse&gt; subjects = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (preferences != null) {</span>
+
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                        for (TutorTeachingPreference preference : preferences) {</span>
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                                if (preference.getSubject() == null) {</span>
+<span class="fc" id="L103">                                        continue;</span>
+                                }
+
+<span class="fc" id="L106">                                String classLevelName = null;</span>
+
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                                if (preference.getClassLevel() != null</span>
+<span class="fc" id="L109">                                                &amp;&amp; preference.getClassLevel()</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                                                                .getStandard() != null) {</span>
+
+<span class="fc" id="L112">                                        classLevelName = &quot;Class &quot;</span>
+<span class="fc" id="L113">                                                        + preference.getClassLevel()</span>
+<span class="fc" id="L114">                                                                        .getStandard();</span>
+                                }
+
+<span class="fc" id="L117">                                TutorTeachingSubjectResponse subjectResponse = TutorTeachingSubjectResponse.builder()</span>
+
+<span class="fc" id="L119">                                                .subjectId(</span>
+<span class="fc" id="L120">                                                                preference.getSubject()</span>
+<span class="fc" id="L121">                                                                                .getId())</span>
+
+<span class="fc" id="L123">                                                .subjectName(</span>
+<span class="fc" id="L124">                                                                preference.getSubject()</span>
+<span class="fc" id="L125">                                                                                .getName())</span>
+
+<span class="fc" id="L127">                                                .classLevelId(</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                                                                preference.getClassLevel() != null</span>
+<span class="fc" id="L129">                                                                                ? preference.getClassLevel()</span>
+<span class="fc" id="L130">                                                                                                .getId()</span>
+<span class="fc" id="L131">                                                                                : null)</span>
+
+<span class="fc" id="L133">                                                .classLevelName(</span>
+                                                                classLevelName)
+
+<span class="fc" id="L136">                                                .boardId(</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                                                                preference.getBoard() != null</span>
+<span class="fc" id="L138">                                                                                ? preference.getBoard()</span>
+<span class="fc" id="L139">                                                                                                .getId()</span>
+<span class="fc" id="L140">                                                                                : null)</span>
+
+<span class="fc" id="L142">                                                .boardName(</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                                                                preference.getBoard() != null</span>
+<span class="fc" id="L144">                                                                                ? preference.getBoard()</span>
+<span class="fc" id="L145">                                                                                                .getName()</span>
+<span class="fc" id="L146">                                                                                : null)</span>
+
+<span class="fc" id="L148">                                                .build();</span>
+
+<span class="fc" id="L150">                                subjects.add(subjectResponse);</span>
+<span class="fc" id="L151">                        }</span>
+                }
+
+<span class="fc" id="L154">                return TutorDetailsResponse.builder()</span>
+
+<span class="fc" id="L156">                                .tutorId(</span>
+<span class="fc" id="L157">                                                tutor.getTutorId())</span>
+
+<span class="fc" id="L159">                                .firstName(</span>
+<span class="fc" id="L160">                                                tutor.getUser().getFirstName())</span>
+
+<span class="fc" id="L162">                                .lastName(</span>
+<span class="fc" id="L163">                                                tutor.getUser().getLastName())</span>
+
+<span class="fc" id="L165">                                .highestQualification(</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                                                tutor.getAcademicProfile() != null</span>
+<span class="fc" id="L167">                                                                ? tutor.getAcademicProfile()</span>
+<span class="fc" id="L168">                                                                                .getHighestQualification()</span>
+<span class="fc" id="L169">                                                                : null)</span>
+
+<span class="fc" id="L171">                                .teachingExperienceYears(</span>
+<span class="fc" id="L172">                                                tutor.getTeachingExperienceYears())</span>
+
+<span class="fc" id="L174">                                .industryExperienceYears(</span>
+<span class="fc" id="L175">                                                tutor.getIndustryExperienceYears())</span>
+
+<span class="fc" id="L177">                                .currentOccupation(</span>
+<span class="fc" id="L178">                                                tutor.getCurrentOccupation())</span>
+
+<span class="fc" id="L180">                                .description(</span>
+<span class="fc" id="L181">                                                tutor.getDescription())</span>
+
+<span class="fc" id="L183">                                .preferredMode(</span>
+<span class="fc" id="L184">                                                preferredModeMapper.toDto(</span>
+<span class="fc" id="L185">                                                                tutor.getPreferredMode()))</span>
+
+<span class="fc" id="L187">                                .distance(distance)</span>
+
+<span class="fc" id="L189">                                .salaryMin(</span>
+<span class="fc" id="L190">                                                tutor.getSalaryMin())</span>
+
+<span class="fc" id="L192">                                .salaryMax(</span>
+<span class="fc" id="L193">                                                tutor.getSalaryMax())</span>
+
+<span class="fc" id="L195">                                .demoVideoUrl(</span>
+<span class="fc" id="L196">                                                tutor.getDemoVideoUrl())</span>
+
+<span class="fc" id="L198">                                .subjects(subjects)</span>
+
+<span class="fc" id="L200">                                .build();</span>
+        }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

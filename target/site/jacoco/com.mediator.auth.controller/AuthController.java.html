@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.auth.controller</a> &gt; <span class="el_source">AuthController.java</span></div><h1>AuthController.java</h1><pre class="source lang-java linenums">package com.mediator.auth.controller;
+
+import com.mediator.auth.dto.request.LoginRequest;
+import com.mediator.auth.dto.request.RegisterStudentRequest;
+import com.mediator.auth.dto.request.RegisterTutorRequest;
+import com.mediator.auth.dto.response.LoginResponse;
+import com.mediator.auth.service.AuthService;
+import com.mediator.common.dto.ApiResponse;
+
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/v1/auth&quot;)
+public class AuthController {
+
+    private final AuthService authService;
+
+<span class="fc" id="L20">    public AuthController(AuthService authService) {</span>
+<span class="fc" id="L21">        this.authService = authService;</span>
+<span class="fc" id="L22">    }</span>
+
+    @PostMapping(&quot;/register/student&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;LoginResponse&gt;&gt; registerStudent(
+            @Valid @RequestBody RegisterStudentRequest request) {
+
+<span class="fc" id="L28">        LoginResponse response = authService.registerStudent(request);</span>
+
+<span class="fc" id="L30">        return ResponseEntity.ok(</span>
+<span class="fc" id="L31">                ApiResponse.success(</span>
+                        &quot;Student registered successfully.&quot;,
+                        response));
+    }
+
+    @PostMapping(&quot;/register/tutor&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;LoginResponse&gt;&gt; registerTutor(
+            @Valid @RequestBody RegisterTutorRequest request) {
+
+<span class="fc" id="L40">        LoginResponse response = authService.registerTutor(request);</span>
+
+<span class="fc" id="L42">        return ResponseEntity.ok(</span>
+<span class="fc" id="L43">                ApiResponse.success(</span>
+                        &quot;Tutor registered successfully.&quot;,
+                        response));
+    }
+
+    @PostMapping(&quot;/login&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;LoginResponse&gt;&gt; login(
+            @Valid @RequestBody LoginRequest request) {
+
+<span class="fc" id="L52">        LoginResponse response = authService.login(request);</span>
+
+<span class="fc" id="L54">        return ResponseEntity.ok(</span>
+<span class="fc" id="L55">                ApiResponse.success(</span>
+                        &quot;Login successful.&quot;,
+                        response));
+    }
+
+    @PostMapping(&quot;/logout&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; logout() {
+
+        // JWT is stateless.
+        // Client simply removes the token.
+<span class="fc" id="L65">        return ResponseEntity.ok(</span>
+<span class="fc" id="L66">                ApiResponse.success(</span>
+                        &quot;Logged out successfully.&quot;,
+                        null));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

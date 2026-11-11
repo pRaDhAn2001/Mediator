@@ -1,0 +1,675 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatchService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.matching.service</a> &gt; <span class="el_source">MatchService.java</span></div><h1>MatchService.java</h1><pre class="source lang-java linenums">package com.mediator.matching.service;
+
+import com.mediator.auth.entity.User;
+import com.mediator.auth.repository.UserRepository;
+import com.mediator.common.exception.BadRequestException;
+import com.mediator.common.exception.ResourceNotFoundException;
+import com.mediator.common.util.DistanceUtils;
+import com.mediator.matching.dto.request.TutorSearchRequest;
+import com.mediator.matching.dto.response.TutorCardResponse;
+import com.mediator.matching.dto.response.TutorDetailsResponse;
+import com.mediator.matching.dto.response.TutorSearchResponse;
+import com.mediator.matching.entity.MatchScore;
+import com.mediator.matching.mapper.MatchMapper;
+import com.mediator.student.entity.Student;
+import com.mediator.student.repository.StudentRepository;
+import com.mediator.subscription.entity.Subscription;
+import com.mediator.subscription.entity.SubscriptionPlanType;
+import com.mediator.subscription.entity.SubscriptionStatus;
+import com.mediator.subscription.repository.SubscriptionRepository;
+import com.mediator.tutor.entity.ProfileStatus;
+import com.mediator.tutor.entity.Tutor;
+import com.mediator.tutor.entity.TutorTeachingPreference;
+import com.mediator.tutor.entity.VerificationStatus;
+import com.mediator.tutor.repository.TutorRepository;
+import com.mediator.tutor.repository.TutorTeachingPreferenceRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class MatchService {
+
+        private final TutorRepository tutorRepository;
+
+        private final StudentRepository studentRepository;
+
+        private final UserRepository userRepository;
+
+        private final SubscriptionRepository subscriptionRepository;
+
+        private final TutorTeachingPreferenceRepository tutorTeachingPreferenceRepository;
+
+        private final MatchMapper matchMapper;
+
+        // ============================================================
+        // STUDENT TUTOR SEARCH
+        // ============================================================
+
+        @Transactional(readOnly = true)
+        public TutorSearchResponse searchTutors(
+                        TutorSearchRequest request) {
+
+<span class="fc" id="L60">                validateSearchRequest(request);</span>
+
+<span class="fc" id="L62">                List&lt;Tutor&gt; tutors = tutorRepository.findSearchableTutors()</span>
+<span class="fc" id="L63">                                .stream()</span>
+<span class="fc" id="L64">                                .filter(this::isTutorSearchable)</span>
+<span class="fc" id="L65">                                .filter(tutor -&gt; matchesFilters(tutor, request))</span>
+<span class="fc" id="L66">                                .toList();</span>
+
+<span class="fc" id="L68">                List&lt;MatchScore&gt; scores = tutors.stream()</span>
+<span class="fc" id="L69">                                .map(tutor -&gt; calculateMatchScore(tutor, request))</span>
+<span class="fc" id="L70">                                .sorted(</span>
+                                                Comparator
+<span class="fc" id="L72">                                                                .comparing(</span>
+                                                                                MatchScore::getMatchedSubjects,
+<span class="fc" id="L74">                                                                                Comparator.reverseOrder())</span>
+<span class="fc" id="L75">                                                                .thenComparing(</span>
+                                                                                MatchScore::getDistance,
+<span class="fc" id="L77">                                                                                Comparator.nullsLast(</span>
+<span class="fc" id="L78">                                                                                                Comparator.naturalOrder()))</span>
+<span class="fc" id="L79">                                                                .thenComparing(</span>
+                                                                                MatchScore::getScore,
+<span class="fc" id="L81">                                                                                Comparator.reverseOrder()))</span>
+<span class="fc" id="L82">                                .toList();</span>
+
+<span class="fc" id="L84">                return buildSearchResponse(</span>
+                                scores,
+<span class="fc" id="L86">                                request.getPage(),</span>
+<span class="fc" id="L87">                                request.getSize());</span>
+        }
+
+        // ============================================================
+        // STUDENT VIEW TUTOR DETAILS
+        // ============================================================
+
+        @Transactional(readOnly = true)
+        public TutorDetailsResponse getTutorDetails(
+                        String email,
+                        Long tutorId) {
+
+<span class="fc" id="L99">                Student student = getStudent(email);</span>
+
+<span class="fc" id="L101">                Tutor tutor = tutorRepository.findById(tutorId)</span>
+<span class="fc" id="L102">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;Tutor not found.&quot;));
+
+<span class="fc" id="L105">                validateTutorVisibleToStudent(tutor);</span>
+
+<span class="fc" id="L107">                List&lt;TutorTeachingPreference&gt; preferences = tutorTeachingPreferenceRepository</span>
+<span class="fc" id="L108">                                .findByTutor_TutorId(</span>
+<span class="fc" id="L109">                                                tutor.getTutorId());</span>
+
+<span class="fc" id="L111">                Double distance = calculateTutorDistance(</span>
+                                student,
+                                tutor);
+
+<span class="fc" id="L115">                return matchMapper.toDetails(</span>
+                                tutor,
+                                distance,
+                                preferences);
+        }
+
+        // ============================================================
+        // SEARCH VALIDATION
+        // ============================================================
+
+        private void validateSearchRequest(
+                        TutorSearchRequest request) {
+
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                if (request.getSubjectIds() == null</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                                || request.getSubjectIds().isEmpty()) {</span>
+
+<span class="fc" id="L131">                        throw new BadRequestException(</span>
+                                        &quot;At least one subject is required.&quot;);
+                }
+
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                if (request.getPage() == null</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                                || request.getPage() &lt; 0) {</span>
+
+<span class="fc" id="L138">                        throw new BadRequestException(</span>
+                                        &quot;Page must be zero or greater.&quot;);
+                }
+
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                if (request.getSize() == null</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                                || request.getSize() &lt;= 0) {</span>
+
+<span class="fc" id="L145">                        throw new BadRequestException(</span>
+                                        &quot;Size must be greater than zero.&quot;);
+                }
+
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                if (request.getSize() &gt; 50) {</span>
+
+<span class="fc" id="L151">                        throw new BadRequestException(</span>
+                                        &quot;Maximum page size is 50.&quot;);
+                }
+
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                boolean studentHome = request.getPreferredMode() != null</span>
+<span class="fc" id="L156">                                &amp;&amp; request.getPreferredMode()</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                                                .isStudentHome();</span>
+
+<span class="fc bfc" id="L159" title="All 2 branches covered.">                if (studentHome) {</span>
+
+<span class="fc bfc" id="L161" title="All 2 branches covered.">                        if (request.getLatitude() == null</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                                        || request.getLongitude() == null) {</span>
+
+<span class="fc" id="L164">                                throw new BadRequestException(</span>
+                                                &quot;Latitude and longitude are required &quot;
+                                                                + &quot;for student-home search.&quot;);
+                        }
+
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                        if (request.getRadius() == null</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                                        || request.getRadius() &lt;= 0) {</span>
+
+<span class="fc" id="L172">                                throw new BadRequestException(</span>
+                                                &quot;Radius must be greater than zero &quot;
+                                                                + &quot;for student-home search.&quot;);
+                        }
+
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                        if (request.getLatitude() &lt; -90</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                                        || request.getLatitude() &gt; 90) {</span>
+
+<span class="fc" id="L180">                                throw new BadRequestException(</span>
+                                                &quot;Invalid latitude.&quot;);
+                        }
+
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                        if (request.getLongitude() &lt; -180</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">                                        || request.getLongitude() &gt; 180) {</span>
+
+<span class="fc" id="L187">                                throw new BadRequestException(</span>
+                                                &quot;Invalid longitude.&quot;);
+                        }
+                }
+<span class="fc" id="L191">        }</span>
+
+        // ============================================================
+        // SEARCHABLE TUTOR
+        // ============================================================
+
+        private boolean isTutorSearchable(
+                        Tutor tutor) {
+
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                return tutor.getVerificationStatus() == VerificationStatus.APPROVED</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                                &amp;&amp; tutor.getProfileStatus() == ProfileStatus.LIVE;</span>
+        }
+
+        // ============================================================
+        // FILTER MATCHING
+        // ============================================================
+
+        private boolean matchesFilters(
+                        Tutor tutor,
+                        TutorSearchRequest request) {
+
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                if (!matchesPreferredMode(</span>
+                                tutor,
+                                request)) {
+
+<span class="fc" id="L216">                        return false;</span>
+                }
+
+<span class="fc" id="L219">                List&lt;TutorTeachingPreference&gt; preferences = tutorTeachingPreferenceRepository</span>
+<span class="fc" id="L220">                                .findByTutor_TutorId(</span>
+<span class="fc" id="L221">                                                tutor.getTutorId());</span>
+
+<span class="fc bfc" id="L223" title="All 2 branches covered.">                if (preferences.isEmpty()) {</span>
+<span class="fc" id="L224">                        return false;</span>
+                }
+
+<span class="fc" id="L227">                Set&lt;Long&gt; requestedSubjectIds = new HashSet&lt;&gt;(</span>
+<span class="fc" id="L228">                                request.getSubjectIds());</span>
+
+<span class="fc" id="L230">                Set&lt;Long&gt; matchingSubjects = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                for (TutorTeachingPreference preference : preferences) {</span>
+
+<span class="fc bfc" id="L234" title="All 2 branches covered.">                        if (preference.getSubject() == null) {</span>
+<span class="fc" id="L235">                                continue;</span>
+                        }
+
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                        if (request.getBoardId() != null</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                                        &amp;&amp; (preference.getBoard() == null</span>
+<span class="fc" id="L240">                                                        || !preference.getBoard()</span>
+<span class="fc" id="L241">                                                                        .getId()</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">                                                                        .equals(request.getBoardId()))) {</span>
+
+<span class="fc" id="L244">                                continue;</span>
+                        }
+
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                        if (request.getClassLevelId() != null</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                                        &amp;&amp; (preference.getClassLevel() == null</span>
+<span class="fc" id="L249">                                                        || !preference.getClassLevel()</span>
+<span class="fc" id="L250">                                                                        .getId()</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                                                                        .equals(</span>
+<span class="fc" id="L252">                                                                                        request.getClassLevelId()))) {</span>
+
+<span class="fc" id="L254">                                continue;</span>
+                        }
+
+<span class="fc bfc" id="L257" title="All 2 branches covered.">                        if (requestedSubjectIds.contains(</span>
+<span class="fc" id="L258">                                        preference.getSubject().getId())) {</span>
+
+<span class="fc" id="L260">                                matchingSubjects.add(</span>
+<span class="fc" id="L261">                                                preference.getSubject().getId());</span>
+                        }
+<span class="fc" id="L263">                }</span>
+
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                if (matchingSubjects.isEmpty()) {</span>
+<span class="fc" id="L266">                        return false;</span>
+                }
+
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                boolean studentHome = request.getPreferredMode() != null</span>
+<span class="fc" id="L270">                                &amp;&amp; request.getPreferredMode()</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                                                .isStudentHome();</span>
+
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                if (studentHome) {</span>
+
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                        if (tutor.getAddress() == null</span>
+<span class="fc" id="L276">                                        || tutor.getAddress()</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">                                                        .getLatitude() == null</span>
+<span class="fc" id="L278">                                        || tutor.getAddress()</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">                                                        .getLongitude() == null) {</span>
+
+<span class="fc" id="L281">                                return false;</span>
+                        }
+
+<span class="fc" id="L284">                        double distance = DistanceUtils.calculateDistance(</span>
+<span class="fc" id="L285">                                        request.getLatitude(),</span>
+<span class="fc" id="L286">                                        request.getLongitude(),</span>
+<span class="fc" id="L287">                                        tutor.getAddress()</span>
+<span class="fc" id="L288">                                                        .getLatitude(),</span>
+<span class="fc" id="L289">                                        tutor.getAddress()</span>
+<span class="fc" id="L290">                                                        .getLongitude());</span>
+
+<span class="fc bfc" id="L292" title="All 2 branches covered.">                        if (distance &gt; request.getRadius()) {</span>
+<span class="fc" id="L293">                                return false;</span>
+                        }
+                }
+
+<span class="fc" id="L297">                return true;</span>
+        }
+
+        // ============================================================
+        // PREFERRED MODE
+        // ============================================================
+
+        private boolean matchesPreferredMode(
+                        Tutor tutor,
+                        TutorSearchRequest request) {
+
+<span class="fc bfc" id="L308" title="All 2 branches covered.">                if (request.getPreferredMode() == null) {</span>
+<span class="fc" id="L309">                        return true;</span>
+                }
+
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                if (tutor.getPreferredMode() == null) {</span>
+<span class="fc" id="L313">                        return false;</span>
+                }
+
+<span class="fc" id="L316">                boolean requestedOnline = request.getPreferredMode().isOnline();</span>
+
+<span class="fc" id="L318">                boolean requestedTutorHome = request.getPreferredMode().isTutorHome();</span>
+
+<span class="fc" id="L320">                boolean requestedStudentHome = request.getPreferredMode().isStudentHome();</span>
+
+<span class="fc" id="L322">                boolean matched = false;</span>
+
+<span class="fc bfc" id="L324" title="All 2 branches covered.">                if (requestedOnline</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                                &amp;&amp; tutor.getPreferredMode().isOnline()) {</span>
+
+<span class="fc" id="L327">                        matched = true;</span>
+                }
+
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                if (requestedTutorHome</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                                &amp;&amp; tutor.getPreferredMode().isTutorHome()) {</span>
+
+<span class="fc" id="L333">                        matched = true;</span>
+                }
+
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                if (requestedStudentHome</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                                &amp;&amp; tutor.getPreferredMode().isStudentHome()) {</span>
+
+<span class="fc" id="L339">                        matched = true;</span>
+                }
+
+<span class="fc" id="L342">                return matched;</span>
+        }
+
+        // ============================================================
+        // MATCH SCORE
+        // ============================================================
+
+        private MatchScore calculateMatchScore(
+                        Tutor tutor,
+                        TutorSearchRequest request) {
+
+<span class="fc" id="L353">                List&lt;TutorTeachingPreference&gt; preferences = tutorTeachingPreferenceRepository</span>
+<span class="fc" id="L354">                                .findByTutor_TutorId(</span>
+<span class="fc" id="L355">                                                tutor.getTutorId());</span>
+
+<span class="fc" id="L357">                Set&lt;Long&gt; requestedSubjectIds = new HashSet&lt;&gt;(</span>
+<span class="fc" id="L358">                                request.getSubjectIds());</span>
+
+<span class="fc" id="L360">                Set&lt;Long&gt; matchedSubjectIds = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L362" title="All 2 branches covered.">                for (TutorTeachingPreference preference : preferences) {</span>
+
+<span class="fc bfc" id="L364" title="All 2 branches covered.">                        if (preference.getSubject() == null) {</span>
+<span class="fc" id="L365">                                continue;</span>
+                        }
+
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">                        if (request.getBoardId() != null</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">                                        &amp;&amp; (preference.getBoard() == null</span>
+<span class="fc" id="L370">                                                        || !preference.getBoard()</span>
+<span class="fc" id="L371">                                                                        .getId()</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                                                                        .equals(request.getBoardId()))) {</span>
+
+<span class="nc" id="L374">                                continue;</span>
+                        }
+
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">                        if (request.getClassLevelId() != null</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">                                        &amp;&amp; (preference.getClassLevel() == null</span>
+<span class="fc" id="L379">                                                        || !preference.getClassLevel()</span>
+<span class="fc" id="L380">                                                                        .getId()</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">                                                                        .equals(</span>
+<span class="fc" id="L382">                                                                                        request.getClassLevelId()))) {</span>
+
+<span class="nc" id="L384">                                continue;</span>
+                        }
+
+<span class="fc" id="L387">                        Long subjectId = preference.getSubject().getId();</span>
+
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">                        if (requestedSubjectIds.contains(subjectId)) {</span>
+
+<span class="fc" id="L391">                                matchedSubjectIds.add(subjectId);</span>
+                        }
+<span class="fc" id="L393">                }</span>
+
+<span class="fc" id="L395">                int matchedSubjects = matchedSubjectIds.size();</span>
+
+<span class="fc" id="L397">                int totalRequestedSubjects = requestedSubjectIds.size();</span>
+
+<span class="fc bfc" id="L399" title="All 2 branches covered.">                double matchPercentage = totalRequestedSubjects == 0</span>
+<span class="fc" id="L400">                                ? 0</span>
+                                : ((double) matchedSubjects
+<span class="fc" id="L402">                                                / totalRequestedSubjects) * 100;</span>
+
+<span class="fc" id="L404">                Double distance = calculateSearchDistance(</span>
+                                tutor,
+                                request);
+
+<span class="fc" id="L408">                int score = calculateSecondaryScore(tutor);</span>
+
+<span class="fc" id="L410">                SubscriptionPlanType subscriptionPlan = getSubscriptionPlan(tutor);</span>
+
+<span class="fc" id="L412">                return MatchScore.builder()</span>
+<span class="fc" id="L413">                                .tutor(tutor)</span>
+<span class="fc" id="L414">                                .matchedSubjects(matchedSubjects)</span>
+<span class="fc" id="L415">                                .totalRequestedSubjects(</span>
+                                                totalRequestedSubjects)
+<span class="fc" id="L417">                                .matchPercentage(</span>
+<span class="fc" id="L418">                                                Math.round(</span>
+                                                                matchPercentage * 100.0)
+                                                                / 100.0)
+<span class="fc" id="L421">                                .distance(distance)</span>
+<span class="fc" id="L422">                                .score(score)</span>
+<span class="fc" id="L423">                                .subscriptionPlan(</span>
+                                                subscriptionPlan)
+<span class="fc" id="L425">                                .build();</span>
+        }
+
+        // ============================================================
+        // DISTANCE FOR SEARCH
+        // ============================================================
+
+        private Double calculateSearchDistance(
+                        Tutor tutor,
+                        TutorSearchRequest request) {
+
+<span class="fc bfc" id="L436" title="All 2 branches covered.">                boolean studentHome = request.getPreferredMode() != null</span>
+<span class="fc" id="L437">                                &amp;&amp; request.getPreferredMode()</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">                                                .isStudentHome();</span>
+
+<span class="fc bfc" id="L440" title="All 2 branches covered.">                if (!studentHome) {</span>
+<span class="fc" id="L441">                        return 0.0;</span>
+                }
+
+<span class="fc bfc" id="L444" title="All 2 branches covered.">                if (tutor.getAddress() == null</span>
+<span class="fc" id="L445">                                || tutor.getAddress()</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">                                                .getLatitude() == null</span>
+<span class="fc" id="L447">                                || tutor.getAddress()</span>
+<span class="fc bfc" id="L448" title="All 2 branches covered.">                                                .getLongitude() == null) {</span>
+
+<span class="fc" id="L450">                        return Double.MAX_VALUE;</span>
+                }
+
+<span class="fc" id="L453">                return DistanceUtils.calculateDistance(</span>
+<span class="fc" id="L454">                                request.getLatitude(),</span>
+<span class="fc" id="L455">                                request.getLongitude(),</span>
+<span class="fc" id="L456">                                tutor.getAddress()</span>
+<span class="fc" id="L457">                                                .getLatitude(),</span>
+<span class="fc" id="L458">                                tutor.getAddress()</span>
+<span class="fc" id="L459">                                                .getLongitude());</span>
+        }
+
+        // ============================================================
+        // SECONDARY SCORE
+        // ============================================================
+
+        private int calculateSecondaryScore(
+                        Tutor tutor) {
+
+<span class="fc" id="L469">                int score = 0;</span>
+
+<span class="fc bfc" id="L471" title="All 2 branches covered.">                if (tutor.getVerificationStatus() == VerificationStatus.APPROVED) {</span>
+
+<span class="fc" id="L473">                        score += 100;</span>
+                }
+
+<span class="fc bfc" id="L476" title="All 2 branches covered.">                if (tutor.getTeachingExperienceYears() != null) {</span>
+
+<span class="fc" id="L478">                        score += Math.min(</span>
+<span class="fc" id="L479">                                        tutor.getTeachingExperienceYears()</span>
+                                                        * 5,
+                                        50);
+                }
+
+<span class="fc" id="L484">                SubscriptionPlanType plan = getSubscriptionPlan(tutor);</span>
+
+<span class="fc bfc" id="L486" title="All 2 branches covered.">                if (plan != null) {</span>
+
+<span class="pc bpc" id="L488" title="1 of 4 branches missed.">                        switch (plan) {</span>
+
+                                case ULTRA:
+<span class="fc" id="L491">                                        score += 30;</span>
+<span class="fc" id="L492">                                        break;</span>
+
+                                case PRO:
+<span class="fc" id="L495">                                        score += 20;</span>
+<span class="fc" id="L496">                                        break;</span>
+
+                                case BASIC:
+<span class="fc" id="L499">                                        score += 10;</span>
+<span class="fc" id="L500">                                        break;</span>
+
+                                default:
+                                        break;
+                        }
+                }
+
+<span class="fc" id="L507">                return score;</span>
+        }
+
+        // ============================================================
+        // SUBSCRIPTION
+        // ============================================================
+
+        private SubscriptionPlanType getSubscriptionPlan(
+                        Tutor tutor) {
+
+<span class="fc" id="L517">                Subscription subscription = subscriptionRepository</span>
+<span class="fc" id="L518">                                .findByTutor_TutorIdAndStatus(</span>
+<span class="fc" id="L519">                                                tutor.getTutorId(),</span>
+                                                SubscriptionStatus.ACTIVE)
+<span class="fc" id="L521">                                .orElse(null);</span>
+
+<span class="fc bfc" id="L523" title="All 2 branches covered.">                if (subscription == null</span>
+<span class="fc bfc" id="L524" title="All 2 branches covered.">                                || subscription.getSubscriptionPlan() == null) {</span>
+
+<span class="fc" id="L526">                        return null;</span>
+                }
+
+<span class="fc" id="L529">                return subscription</span>
+<span class="fc" id="L530">                                .getSubscriptionPlan()</span>
+<span class="fc" id="L531">                                .getPlanType();</span>
+        }
+
+        // ============================================================
+        // BUILD SEARCH RESPONSE
+        // ============================================================
+
+        private TutorSearchResponse buildSearchResponse(
+                        List&lt;MatchScore&gt; scores,
+                        Integer page,
+                        Integer size) {
+
+<span class="fc" id="L543">                int totalElements = scores.size();</span>
+
+<span class="fc bfc" id="L545" title="All 2 branches covered.">                int totalPages = totalElements == 0</span>
+<span class="fc" id="L546">                                ? 0</span>
+<span class="fc" id="L547">                                : (int) Math.ceil(</span>
+                                                (double) totalElements
+<span class="fc" id="L549">                                                                / size);</span>
+
+<span class="fc" id="L551">                int start = page * size;</span>
+
+<span class="fc" id="L553">                int end = Math.min(</span>
+<span class="fc" id="L554">                                start + size,</span>
+                                totalElements);
+
+                List&lt;TutorCardResponse&gt; tutors;
+
+<span class="fc bfc" id="L559" title="All 2 branches covered.">                if (start &gt;= totalElements) {</span>
+
+<span class="fc" id="L561">                        tutors = List.of();</span>
+
+                } else {
+
+<span class="fc" id="L565">                        tutors = scores</span>
+<span class="fc" id="L566">                                        .subList(start, end)</span>
+<span class="fc" id="L567">                                        .stream()</span>
+<span class="fc" id="L568">                                        .map(score -&gt; {</span>
+
+<span class="fc" id="L570">                                                List&lt;TutorTeachingPreference&gt; preferences = tutorTeachingPreferenceRepository</span>
+<span class="fc" id="L571">                                                                .findByTutor_TutorId(</span>
+<span class="fc" id="L572">                                                                                score.getTutor()</span>
+<span class="fc" id="L573">                                                                                                .getTutorId());</span>
+
+<span class="fc" id="L575">                                                return matchMapper.toCard(</span>
+                                                                score,
+                                                                preferences);
+                                        })
+<span class="fc" id="L579">                                        .toList();</span>
+                }
+
+<span class="fc" id="L582">                return TutorSearchResponse.builder()</span>
+<span class="fc" id="L583">                                .tutors(tutors)</span>
+<span class="fc" id="L584">                                .currentPage(page)</span>
+<span class="fc" id="L585">                                .totalPages(totalPages)</span>
+<span class="fc" id="L586">                                .totalElements(</span>
+<span class="fc" id="L587">                                                (long) totalElements)</span>
+<span class="fc" id="L588">                                .hasNext(</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">                                                page + 1 &lt; totalPages)</span>
+<span class="fc" id="L590">                                .build();</span>
+        }
+
+        // ============================================================
+        // STUDENT
+        // ============================================================
+
+        private Student getStudent(
+                        String email) {
+
+<span class="fc" id="L600">                User user = userRepository.findByEmail(email)</span>
+<span class="fc" id="L601">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;User not found.&quot;));
+
+<span class="fc" id="L604">                return studentRepository</span>
+<span class="fc" id="L605">                                .findByUser(user)</span>
+<span class="fc" id="L606">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;Student profile not found.&quot;));
+        }
+
+        // ============================================================
+        // TUTOR VISIBILITY
+        // ============================================================
+
+        private void validateTutorVisibleToStudent(
+                        Tutor tutor) {
+
+<span class="fc bfc" id="L617" title="All 2 branches covered.">                if (tutor.getVerificationStatus() != VerificationStatus.APPROVED) {</span>
+
+<span class="fc" id="L619">                        throw new ResourceNotFoundException(</span>
+                                        &quot;Tutor not found.&quot;);
+                }
+
+<span class="fc bfc" id="L623" title="All 2 branches covered.">                if (tutor.getProfileStatus() != ProfileStatus.LIVE) {</span>
+
+<span class="fc" id="L625">                        throw new ResourceNotFoundException(</span>
+                                        &quot;Tutor not found.&quot;);
+                }
+<span class="fc" id="L628">        }</span>
+
+        // ============================================================
+        // TUTOR DISTANCE FOR DETAILS
+        // ============================================================
+
+        private Double calculateTutorDistance(
+                        Student student,
+                        Tutor tutor) {
+
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">                if (tutor.getPreferredMode() != null</span>
+<span class="fc bfc" id="L639" title="All 2 branches covered.">                                &amp;&amp; tutor.getPreferredMode().isOnline()</span>
+<span class="fc bfc" id="L640" title="All 2 branches covered.">                                &amp;&amp; !tutor.getPreferredMode().isStudentHome()</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">                                &amp;&amp; !tutor.getPreferredMode().isTutorHome()) {</span>
+
+<span class="fc" id="L643">                        return 0.0;</span>
+                }
+
+<span class="fc bfc" id="L646" title="All 2 branches covered.">                if (student.getAddress() == null</span>
+<span class="fc" id="L647">                                || student.getAddress()</span>
+<span class="fc bfc" id="L648" title="All 2 branches covered.">                                                .getLatitude() == null</span>
+<span class="fc" id="L649">                                || student.getAddress()</span>
+<span class="fc bfc" id="L650" title="All 2 branches covered.">                                                .getLongitude() == null) {</span>
+
+<span class="fc" id="L652">                        return null;</span>
+                }
+
+<span class="fc bfc" id="L655" title="All 2 branches covered.">                if (tutor.getAddress() == null</span>
+<span class="fc" id="L656">                                || tutor.getAddress()</span>
+<span class="fc bfc" id="L657" title="All 2 branches covered.">                                                .getLatitude() == null</span>
+<span class="fc" id="L658">                                || tutor.getAddress()</span>
+<span class="fc bfc" id="L659" title="All 2 branches covered.">                                                .getLongitude() == null) {</span>
+
+<span class="fc" id="L661">                        return null;</span>
+                }
+
+<span class="fc" id="L664">                return DistanceUtils.calculateDistance(</span>
+<span class="fc" id="L665">                                student.getAddress()</span>
+<span class="fc" id="L666">                                                .getLatitude(),</span>
+<span class="fc" id="L667">                                student.getAddress()</span>
+<span class="fc" id="L668">                                                .getLongitude(),</span>
+<span class="fc" id="L669">                                tutor.getAddress()</span>
+<span class="fc" id="L670">                                                .getLatitude(),</span>
+<span class="fc" id="L671">                                tutor.getAddress()</span>
+<span class="fc" id="L672">                                                .getLongitude());</span>
+        }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

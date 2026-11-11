@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StudentService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.student.service</a> &gt; <span class="el_source">StudentService.java</span></div><h1>StudentService.java</h1><pre class="source lang-java linenums">package com.mediator.student.service;
+
+import java.util.List;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.mediator.common.exception.ResourceNotFoundException;
+import com.mediator.master.dto.SubjectResponse;
+import com.mediator.master.entity.Board;
+import com.mediator.master.entity.ClassLevel;
+import com.mediator.master.entity.Subject;
+import com.mediator.master.repository.BoardRepository;
+import com.mediator.master.repository.ClassLevelRepository;
+import com.mediator.master.repository.SubjectRepository;
+import com.mediator.student.dto.preference.StudentPreferenceDto;
+import com.mediator.student.dto.request.StudentProfileRequest;
+import com.mediator.student.dto.dashboard.StudentDashboardResponse;
+import com.mediator.student.dto.response.StudentProfileResponse;
+
+import com.mediator.student.entity.ContactOwner;
+import com.mediator.student.entity.Student;
+import com.mediator.student.entity.StudentPreference;
+import com.mediator.student.mapper.StudentMapper;
+import com.mediator.student.repository.StudentPreferenceRepository;
+import com.mediator.student.repository.StudentRepository;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class StudentService {
+
+    private final StudentRepository studentRepository;
+
+    private final StudentPreferenceRepository studentPreferenceRepository;
+
+    private final SubjectRepository subjectRepository;
+
+    private final BoardRepository boardRepository;
+
+    private final ClassLevelRepository classLevelRepository;
+
+    private final StudentMapper studentMapper;
+
+    /**
+     * Returns logged-in student's profile.
+     */
+    @Transactional(readOnly = true)
+    public StudentProfileResponse getProfile() {
+
+<span class="fc" id="L55">        Student student = getLoggedInStudent();</span>
+
+<span class="fc" id="L57">        List&lt;StudentPreference&gt; preferences =</span>
+<span class="fc" id="L58">                studentPreferenceRepository.findByStudent_StudentId(</span>
+<span class="fc" id="L59">                        student.getStudentId());</span>
+
+<span class="fc" id="L61">        Integer completion =</span>
+<span class="fc" id="L62">                calculateProfileCompletion(student, preferences);</span>
+
+<span class="fc" id="L64">        return studentMapper.toResponse(</span>
+                student,
+                preferences,
+                completion);
+    }
+
+    /**
+     * Dashboard.
+     */
+    @Transactional(readOnly = true)
+    public StudentDashboardResponse getDashboard() {
+
+<span class="fc" id="L76">        StudentProfileResponse profile = getProfile();</span>
+
+<span class="fc" id="L78">        return StudentDashboardResponse.builder()</span>
+<span class="fc" id="L79">                .profile(profile)</span>
+<span class="fc" id="L80">                .profileCompletion(profile.getProfileCompletion())</span>
+<span class="fc" id="L81">                .activeMatchesCount(0L)</span>
+<span class="fc" id="L82">                .pendingMatchesCount(0L)</span>
+<span class="fc" id="L83">                .cancelledMatchesCount(0L)</span>
+<span class="fc" id="L84">                .build();</span>
+    }
+
+    /**
+     * Update student profile.
+     */
+    @Transactional
+    public StudentProfileResponse updateProfile(
+            StudentProfileRequest request) {
+
+<span class="fc" id="L94">        Student student = getLoggedInStudent();</span>
+
+<span class="fc" id="L96">        Board board = boardRepository.findById(</span>
+<span class="fc" id="L97">                request.getBoardId())</span>
+<span class="fc" id="L98">                .orElseThrow(() -&gt;</span>
+<span class="fc" id="L99">                        new ResourceNotFoundException(</span>
+                                &quot;Board not found with id : &quot;
+<span class="fc" id="L101">                                        + request.getBoardId()));</span>
+
+<span class="fc" id="L103">        ClassLevel classLevel =</span>
+<span class="fc" id="L104">                classLevelRepository.findById(</span>
+<span class="fc" id="L105">                        request.getClassLevelId())</span>
+<span class="fc" id="L106">                        .orElseThrow(() -&gt;</span>
+<span class="fc" id="L107">                                new ResourceNotFoundException(</span>
+                                        &quot;Class Level not found with id : &quot;
+<span class="fc" id="L109">                                                + request.getClassLevelId()));</span>
+
+<span class="fc" id="L111">        studentMapper.updateStudentEntity(</span>
+                student,
+                request,
+                board,
+                classLevel);
+
+        /*
+         * Parent Phone
+         */
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (Boolean.TRUE.equals(request.getSameAsPrimaryPhone())) {</span>
+
+<span class="fc" id="L122">            student.setParentPhone(</span>
+<span class="fc" id="L123">                    student.getUser().getMobileNumber());</span>
+
+<span class="fc" id="L125">            student.setPrimaryMobileOwner(ContactOwner.SELF);</span>
+
+        } else {
+
+<span class="fc" id="L129">            student.setParentPhone(</span>
+<span class="fc" id="L130">                    request.getParentPhone());</span>
+
+<span class="fc" id="L132">            student.setPrimaryMobileOwner(ContactOwner.PARENT);</span>
+        }
+
+        /*
+         * Parent Email
+         */
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (Boolean.TRUE.equals(request.getSameAsPrimaryEmail())) {</span>
+
+<span class="fc" id="L140">            student.setParentEmail(</span>
+<span class="fc" id="L141">                    student.getUser().getEmail());</span>
+
+<span class="fc" id="L143">            student.setPrimaryEmailOwner(ContactOwner.SELF);</span>
+
+        } else {
+
+<span class="fc" id="L147">            student.setParentEmail(</span>
+<span class="fc" id="L148">                    request.getParentEmail());</span>
+
+<span class="fc" id="L150">            student.setPrimaryEmailOwner(ContactOwner.PARENT);</span>
+        }
+
+<span class="fc" id="L153">        studentRepository.save(student);</span>
+
+<span class="fc" id="L155">        List&lt;StudentPreference&gt; preferences =</span>
+<span class="fc" id="L156">                studentPreferenceRepository.findByStudent_StudentId(</span>
+<span class="fc" id="L157">                        student.getStudentId());</span>
+
+<span class="fc" id="L159">        Integer completion =</span>
+<span class="fc" id="L160">                calculateProfileCompletion(</span>
+                        student,
+                        preferences);
+
+<span class="fc" id="L164">        return studentMapper.toResponse(</span>
+                student,
+                preferences,
+                completion);
+    }
+
+    /**
+     * Update preferred subjects.
+     */
+    public List&lt;SubjectResponse&gt; updatePreferences(
+            StudentPreferenceDto request) {
+
+<span class="fc" id="L176">        Student student = getLoggedInStudent();</span>
+
+<span class="fc" id="L178">        List&lt;Subject&gt; subjects =</span>
+<span class="fc" id="L179">                loadSubjects(request.getSubjectIds());</span>
+
+<span class="fc" id="L181">        replaceStudentSubjects(</span>
+                student,
+<span class="fc" id="L183">                request.getSubjectIds());</span>
+
+<span class="fc" id="L185">        return subjects.stream()</span>
+<span class="fc" id="L186">                .map(studentMapper::toSubjectResponse)</span>
+<span class="fc" id="L187">                .toList();</span>
+    }
+
+    /**
+     * Get preferred subjects.
+     */
+    @Transactional(readOnly = true)
+    public List&lt;SubjectResponse&gt; getPreferences() {
+
+<span class="fc" id="L196">        Student student = getLoggedInStudent();</span>
+
+<span class="fc" id="L198">        return studentPreferenceRepository</span>
+<span class="fc" id="L199">                .findByStudent_StudentId(</span>
+<span class="fc" id="L200">                        student.getStudentId())</span>
+<span class="fc" id="L201">                .stream()</span>
+<span class="fc" id="L202">                .map(StudentPreference::getSubject)</span>
+<span class="fc" id="L203">                .map(studentMapper::toSubjectResponse)</span>
+<span class="fc" id="L204">                .toList();</span>
+    }
+
+    /**
+     * Returns logged in student.
+     */
+    private Student getLoggedInStudent() {
+
+        Authentication authentication =
+                SecurityContextHolder
+<span class="fc" id="L214">                        .getContext()</span>
+<span class="fc" id="L215">                        .getAuthentication();</span>
+
+<span class="fc" id="L217">        String email = authentication.getName();</span>
+
+<span class="fc" id="L219">        return studentRepository</span>
+<span class="fc" id="L220">                .findByUserEmail(email)</span>
+<span class="fc" id="L221">                .orElseThrow(() -&gt;</span>
+<span class="fc" id="L222">                        new ResourceNotFoundException(</span>
+                                &quot;Student profile not found.&quot;));
+    }
+
+    /**
+     * Replace all preferred subjects.
+     */
+    private void replaceStudentSubjects(
+            Student student,
+            List&lt;Long&gt; subjectIds) {
+
+<span class="fc" id="L233">        studentPreferenceRepository.deleteByStudent(student);</span>
+
+<span class="pc bpc" id="L235" title="1 of 4 branches missed.">        if (subjectIds == null || subjectIds.isEmpty()) {</span>
+<span class="fc" id="L236">            return;</span>
+        }
+
+<span class="fc" id="L239">        List&lt;Subject&gt; subjects =</span>
+<span class="fc" id="L240">                loadSubjects(subjectIds);</span>
+
+<span class="fc" id="L242">        List&lt;StudentPreference&gt; preferences =</span>
+<span class="fc" id="L243">                subjects.stream()</span>
+<span class="fc" id="L244">                        .map(subject -&gt; {</span>
+
+<span class="fc" id="L246">                            StudentPreference preference =</span>
+                                    new StudentPreference();
+
+<span class="fc" id="L249">                            preference.setStudent(student);</span>
+
+<span class="fc" id="L251">                            preference.setSubject(subject);</span>
+
+<span class="fc" id="L253">                            return preference;</span>
+
+                        })
+<span class="fc" id="L256">                        .toList();</span>
+
+<span class="fc" id="L258">        studentPreferenceRepository.saveAll(preferences);</span>
+<span class="fc" id="L259">    }</span>
+
+    /**
+     * Load subjects.
+     */
+    private List&lt;Subject&gt; loadSubjects(
+            List&lt;Long&gt; subjectIds) {
+
+<span class="fc" id="L267">        List&lt;Subject&gt; subjects =</span>
+<span class="fc" id="L268">                subjectRepository.findAllById(subjectIds);</span>
+
+<span class="fc" id="L270">        validateSubjects(</span>
+                subjectIds,
+                subjects);
+
+<span class="fc" id="L274">        return subjects;</span>
+    }
+
+    /**
+     * Validate subjects.
+     */
+    private void validateSubjects(
+            List&lt;Long&gt; requestedIds,
+            List&lt;Subject&gt; subjects) {
+
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (requestedIds.size() != subjects.size()) {</span>
+
+<span class="fc" id="L286">            throw new ResourceNotFoundException(</span>
+                    &quot;One or more selected subjects do not exist.&quot;);
+        }
+<span class="fc" id="L289">    }</span>
+
+    /**
+     * Calculate profile completion.
+     */
+    private Integer calculateProfileCompletion(
+            Student student,
+            List&lt;StudentPreference&gt; preferences) {
+
+<span class="fc" id="L298">        int completed = 0;</span>
+
+<span class="fc" id="L300">        final int totalFields = 11;</span>
+
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (student.getGender() != null)</span>
+<span class="fc" id="L303">            completed++;</span>
+
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (student.getAddress() != null)</span>
+<span class="fc" id="L306">            completed++;</span>
+
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        if (student.getPreferredMode() != null)</span>
+<span class="fc" id="L309">            completed++;</span>
+
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (student.getPreferredRadius() != null)</span>
+<span class="fc" id="L312">            completed++;</span>
+
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (student.getClassLevel() != null)</span>
+<span class="fc" id="L315">            completed++;</span>
+
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (student.getBoard() != null)</span>
+<span class="fc" id="L318">            completed++;</span>
+
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        if (student.getSchoolName() != null &amp;&amp;</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">                !student.getSchoolName().isBlank())</span>
+<span class="fc" id="L322">            completed++;</span>
+
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (student.getParentName() != null &amp;&amp;</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">                !student.getParentName().isBlank())</span>
+<span class="fc" id="L326">            completed++;</span>
+
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (student.getParentPhone() != null &amp;&amp;</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">                !student.getParentPhone().isBlank())</span>
+<span class="fc" id="L330">            completed++;</span>
+
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (student.getParentEmail() != null &amp;&amp;</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">                !student.getParentEmail().isBlank())</span>
+<span class="fc" id="L334">            completed++;</span>
+
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        if (preferences != null &amp;&amp;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                !preferences.isEmpty())</span>
+<span class="fc" id="L338">            completed++;</span>
+
+<span class="fc" id="L340">        return (completed * 100) / totalFields;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

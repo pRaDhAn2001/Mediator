@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TutorService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.tutor.service</a> &gt; <span class="el_source">TutorService.java</span></div><h1>TutorService.java</h1><pre class="source lang-java linenums">package com.mediator.tutor.service;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Set;
+
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.stream.Collectors;
+
+import com.mediator.subscription.entity.Subscription;
+import com.mediator.subscription.entity.SubscriptionStatus;
+import com.mediator.subscription.repository.SubscriptionRepository;
+import com.mediator.tutor.dto.dashboard.TutorDashboardResponse;
+import com.mediator.tutor.dto.document.TutorDocumentDto;
+import com.mediator.tutor.entity.DocumentType;
+import com.mediator.tutor.entity.ProfileStatus;
+import com.mediator.tutor.entity.TutorDocument;
+
+import com.mediator.common.exception.BadRequestException;
+import com.mediator.master.entity.Board;
+import com.mediator.master.entity.ClassLevel;
+import com.mediator.master.entity.Subject;
+import com.mediator.tutor.dto.preference.TutorTeachingPreferenceDto;
+import com.mediator.tutor.dto.request.TutorTeachingPreferenceRequest;
+import com.mediator.tutor.entity.TutorTeachingPreference;
+import com.mediator.tutor.entity.VerificationStatus;
+import com.mediator.common.exception.ResourceNotFoundException;
+import com.mediator.master.repository.BoardRepository;
+import com.mediator.master.repository.ClassLevelRepository;
+import com.mediator.master.repository.SubjectRepository;
+import com.mediator.tutor.dto.request.TutorProfileRequest;
+import com.mediator.tutor.dto.response.TutorProfileResponse;
+import com.mediator.tutor.entity.Tutor;
+import com.mediator.tutor.mapper.TutorMapper;
+import com.mediator.tutor.repository.TutorDocumentRepository;
+import com.mediator.tutor.repository.TutorRepository;
+import com.mediator.tutor.repository.TutorTeachingPreferenceRepository;
+import com.mediator.auth.entity.User;
+import com.mediator.auth.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class TutorService {
+
+        private final TutorRepository tutorRepository;
+
+        private final TutorDocumentRepository tutorDocumentRepository;
+
+        private final TutorTeachingPreferenceRepository teachingPreferenceRepository;
+
+        private final UserRepository userRepository;
+
+        private final TutorMapper tutorMapper;
+
+        private final SubjectRepository subjectRepository;
+
+        private final BoardRepository boardRepository;
+
+        private final ClassLevelRepository classLevelRepository;
+
+        private final SubscriptionRepository subscriptionRepository;
+
+        /**
+         * Update Tutor Profile
+         */
+        public TutorProfileResponse updateProfile(
+                        String email,
+                        TutorProfileRequest request) {
+
+<span class="fc" id="L78">                User user = getUser(email);</span>
+
+<span class="fc" id="L80">                Tutor tutor = tutorRepository.findByUser(user)</span>
+<span class="fc" id="L81">                                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Tutor profile not found.&quot;));</span>
+
+<span class="fc" id="L83">                validateSalaryRange(</span>
+<span class="fc" id="L84">                                request.getSalaryMin(),</span>
+<span class="fc" id="L85">                                request.getSalaryMax());</span>
+
+<span class="fc" id="L87">                tutorMapper.updateTutorEntity(</span>
+                                tutor,
+                                request);
+
+<span class="fc" id="L91">                Tutor savedTutor = tutorRepository.save(tutor);</span>
+
+<span class="fc" id="L93">                Integer completion = calculateProfileCompletion(savedTutor);</span>
+
+<span class="fc" id="L95">                List&lt;TutorDocument&gt; documents = tutorDocumentRepository.findByTutor_TutorId(</span>
+<span class="fc" id="L96">                                savedTutor.getTutorId());</span>
+
+<span class="fc" id="L98">                return tutorMapper.toResponse(</span>
+                                savedTutor,
+                                completion,
+                                documents);
+        }
+
+        /**
+         * Get Tutor Profile
+         */
+        @Transactional(readOnly = true)
+        public TutorProfileResponse getProfile(String email) {
+
+<span class="fc" id="L110">                User user = getUser(email);</span>
+
+<span class="fc" id="L112">                Tutor tutor = tutorRepository.findByUser(user)</span>
+<span class="fc" id="L113">                                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Tutor profile not found.&quot;));</span>
+
+<span class="fc" id="L115">                Integer completion = calculateProfileCompletion(tutor);</span>
+
+<span class="fc" id="L117">                List&lt;TutorDocument&gt; documents = tutorDocumentRepository.findByTutor_TutorId(</span>
+<span class="fc" id="L118">                                tutor.getTutorId());</span>
+
+<span class="fc" id="L120">                return tutorMapper.toResponse(</span>
+                                tutor,
+                                completion,
+                                documents);
+        }
+
+        /**
+         * Fetch logged in user.
+         */
+        private User getUser(String email) {
+
+<span class="fc" id="L131">                return userRepository.findByEmail(email)</span>
+<span class="fc" id="L132">                                .orElseThrow(() -&gt; new UsernameNotFoundException(</span>
+                                                &quot;User not found.&quot;));
+        }
+
+        /**
+         * Salary Validation
+         */
+        private void validateSalaryRange(
+                        BigDecimal salaryMin,
+                        BigDecimal salaryMax) {
+
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">                if (salaryMin != null &amp;&amp;</span>
+                                salaryMax != null &amp;&amp;
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                                salaryMin.compareTo(salaryMax) &gt; 0) {</span>
+
+<span class="fc" id="L147">                        throw new IllegalArgumentException(</span>
+                                        &quot;Minimum salary cannot be greater than maximum salary.&quot;);
+                }
+<span class="fc" id="L150">        }</span>
+
+        @Transactional
+        public void updateTeachingPreferences(
+                        String email,
+                        TutorTeachingPreferenceRequest request) {
+
+<span class="fc" id="L157">                User user = getUser(email);</span>
+
+<span class="fc" id="L159">                Tutor tutor = tutorRepository.findByUser(user)</span>
+<span class="fc" id="L160">                                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Tutor profile not found.&quot;));</span>
+
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                if (request.getPreferences() == null ||</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                                request.getPreferences().isEmpty()) {</span>
+
+<span class="fc" id="L165">                        throw new BadRequestException(</span>
+                                        &quot;At least one teaching preference is required.&quot;);
+                }
+
+                /*
+                 * Delete existing preferences
+                 */
+<span class="fc" id="L172">                teachingPreferenceRepository.deleteByTutor_TutorId(</span>
+<span class="fc" id="L173">                                tutor.getTutorId());</span>
+
+<span class="fc" id="L175">                List&lt;TutorTeachingPreference&gt; preferences = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                for (TutorTeachingPreferenceDto dto : request.getPreferences()) {</span>
+
+<span class="fc" id="L179">                        Subject subject = subjectRepository.findById(dto.getSubjectId())</span>
+<span class="fc" id="L180">                                        .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Subject not found.&quot;));</span>
+
+<span class="fc" id="L182">                        Board board = boardRepository.findById(dto.getBoardId())</span>
+<span class="fc" id="L183">                                        .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Board not found.&quot;));</span>
+
+<span class="fc" id="L185">                        ClassLevel classLevel = classLevelRepository.findById(dto.getClassLevelId())</span>
+<span class="pc" id="L186">                                        .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Class Level not found.&quot;));</span>
+
+<span class="fc" id="L188">                        TutorTeachingPreference preference = new TutorTeachingPreference();</span>
+
+<span class="fc" id="L190">                        preference.setTutor(tutor);</span>
+
+<span class="fc" id="L192">                        preference.setSubject(subject);</span>
+
+<span class="fc" id="L194">                        preference.setBoard(board);</span>
+
+<span class="fc" id="L196">                        preference.setClassLevel(classLevel);</span>
+
+<span class="fc" id="L198">                        preferences.add(preference);</span>
+<span class="fc" id="L199">                }</span>
+
+<span class="fc" id="L201">                teachingPreferenceRepository.saveAll(preferences);</span>
+<span class="fc" id="L202">        }</span>
+
+        @Transactional(readOnly = true)
+        public List&lt;TutorTeachingPreferenceDto&gt; getTeachingPreferences(
+                        String email) {
+
+<span class="fc" id="L208">                User user = getUser(email);</span>
+
+<span class="fc" id="L210">                Tutor tutor = tutorRepository.findByUser(user)</span>
+<span class="fc" id="L211">                                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Tutor profile not found.&quot;));</span>
+
+<span class="fc" id="L213">                return teachingPreferenceRepository</span>
+<span class="fc" id="L214">                                .findByTutor_TutorId(tutor.getTutorId())</span>
+<span class="fc" id="L215">                                .stream()</span>
+<span class="fc" id="L216">                                .map(tutorMapper::toPreferenceDto)</span>
+<span class="fc" id="L217">                                .collect(Collectors.toList());</span>
+        }
+
+        @Transactional(readOnly = true)
+        public TutorDashboardResponse getDashboard(String email) {
+
+<span class="fc" id="L223">                User user = getUser(email);</span>
+
+<span class="fc" id="L225">                Tutor tutor = tutorRepository.findByUser(user)</span>
+<span class="fc" id="L226">                                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Tutor profile not found.&quot;));</span>
+
+<span class="fc" id="L228">                Integer completion = calculateProfileCompletion(tutor);</span>
+
+<span class="fc" id="L230">                List&lt;TutorDocument&gt; documents = tutorDocumentRepository.findByTutor_TutorId(</span>
+<span class="fc" id="L231">                                tutor.getTutorId());</span>
+
+<span class="fc" id="L233">                TutorProfileResponse profile = tutorMapper.toResponse(</span>
+                                tutor,
+                                completion,
+                                documents);
+
+<span class="fc" id="L238">                Subscription subscription = subscriptionRepository</span>
+<span class="fc" id="L239">                                .findByTutor_TutorIdAndStatus(</span>
+<span class="fc" id="L240">                                                tutor.getTutorId(),</span>
+                                                SubscriptionStatus.ACTIVE)
+<span class="fc" id="L242">                                .orElse(null);</span>
+
+<span class="fc" id="L244">                return TutorDashboardResponse.builder()</span>
+
+<span class="fc" id="L246">                                .profile(profile)</span>
+
+                                // Matching module not built yet
+<span class="fc" id="L249">                                .totalMatchRequests(0L)</span>
+
+<span class="fc" id="L251">                                .pendingMatchRequests(0L)</span>
+
+<span class="fc" id="L253">                                .activeStudents(0L)</span>
+
+<span class="fc" id="L255">                                .subscriptionStatus(</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">                                                subscription != null</span>
+<span class="fc" id="L257">                                                                ? subscription.getStatus()</span>
+<span class="fc" id="L258">                                                                : null)</span>
+
+<span class="fc" id="L260">                                .currentPlan(</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                                                subscription != null</span>
+<span class="fc" id="L262">                                                                ? subscription.getSubscriptionPlan().getPlanType()</span>
+<span class="fc" id="L263">                                                                : null)</span>
+
+<span class="fc" id="L265">                                .verificationStatus(</span>
+<span class="fc" id="L266">                                                tutor.getVerificationStatus())</span>
+
+<span class="fc" id="L268">                                .build();</span>
+        }
+
+        @Transactional
+        public void uploadDocuments(
+                        String email,
+                        List&lt;TutorDocumentDto&gt; requests) {
+
+<span class="fc" id="L276">                User user = getUser(email);</span>
+
+<span class="fc" id="L278">                Tutor tutor = tutorRepository.findByUser(user)</span>
+<span class="fc" id="L279">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;Tutor profile not found.&quot;));
+
+<span class="fc" id="L282">                List&lt;TutorDocument&gt; documents = requests.stream()</span>
+<span class="fc" id="L283">                                .map(dto -&gt; TutorDocument.builder()</span>
+
+<span class="fc" id="L285">                                                .tutor(tutor)</span>
+
+<span class="fc" id="L287">                                                .documentType(dto.getDocumentType())</span>
+
+<span class="fc" id="L289">                                                .documentUrl(dto.getDocumentUrl())</span>
+
+<span class="fc" id="L291">                                                .verificationStatus(VerificationStatus.PENDING)</span>
+
+<span class="fc" id="L293">                                                .build())</span>
+
+<span class="fc" id="L295">                                .toList();</span>
+
+<span class="fc" id="L297">                Set&lt;DocumentType&gt; requestTypes = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L299" title="All 2 branches covered.">                for (TutorDocumentDto dto : requests) {</span>
+
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                        if (!requestTypes.add(dto.getDocumentType())) {</span>
+
+<span class="fc" id="L303">                                throw new BadRequestException(</span>
+                                                &quot;Duplicate document type in request: &quot;
+<span class="fc" id="L305">                                                                + dto.getDocumentType());</span>
+                        }
+<span class="fc" id="L307">                }</span>
+
+<span class="fc" id="L309">                tutorDocumentRepository.saveAll(documents);</span>
+<span class="fc" id="L310">        }</span>
+
+        @Transactional(readOnly = true)
+        public List&lt;TutorDocumentDto&gt; getDocuments(String email) {
+
+<span class="fc" id="L315">                User user = getUser(email);</span>
+
+<span class="fc" id="L317">                Tutor tutor = tutorRepository.findByUser(user)</span>
+<span class="fc" id="L318">                                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Tutor profile not found.&quot;));</span>
+
+<span class="fc" id="L320">                return tutorDocumentRepository</span>
+<span class="fc" id="L321">                                .findByTutor_TutorId(tutor.getTutorId())</span>
+<span class="fc" id="L322">                                .stream()</span>
+<span class="fc" id="L323">                                .map(this::mapDocumentDto)</span>
+<span class="fc" id="L324">                                .toList();</span>
+        }
+
+        @Transactional
+        public void deleteDocument(
+                        String email,
+                        Long documentId) {
+
+<span class="fc" id="L332">                User user = getUser(email);</span>
+
+<span class="fc" id="L334">                Tutor tutor = tutorRepository.findByUser(user)</span>
+<span class="fc" id="L335">                                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Tutor profile not found.&quot;));</span>
+
+<span class="fc" id="L337">                TutorDocument document = tutorDocumentRepository</span>
+<span class="fc" id="L338">                                .findByDocumentIdAndTutor_TutorId(</span>
+                                                documentId,
+<span class="fc" id="L340">                                                tutor.getTutorId())</span>
+<span class="fc" id="L341">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;Document not found.&quot;));
+
+<span class="fc" id="L344">                tutorDocumentRepository.delete(document);</span>
+<span class="fc" id="L345">        }</span>
+
+        private TutorDocumentDto mapDocumentDto(
+                        TutorDocument document) {
+
+<span class="fc" id="L350">                return TutorDocumentDto.builder()</span>
+
+<span class="fc" id="L352">                                .documentId(document.getDocumentId())</span>
+
+<span class="fc" id="L354">                                .documentType(document.getDocumentType())</span>
+
+<span class="fc" id="L356">                                .documentUrl(document.getDocumentUrl())</span>
+
+<span class="fc" id="L358">                                .verificationStatus(document.getVerificationStatus())</span>
+
+<span class="fc" id="L360">                                .remarks(document.getRemarks())</span>
+
+<span class="fc" id="L362">                                .build();</span>
+        }
+
+        private void updateProfileStatus(Tutor tutor) {
+
+<span class="fc" id="L367">                int completion = calculateProfileCompletion(tutor);</span>
+
+<span class="fc bfc" id="L369" title="All 2 branches covered.">                ProfileStatus newStatus = completion &gt;= 80</span>
+<span class="fc" id="L370">                                ? ProfileStatus.LIVE</span>
+<span class="fc" id="L371">                                : ProfileStatus.DRAFT;</span>
+
+<span class="fc bfc" id="L373" title="All 2 branches covered.">                if (tutor.getProfileStatus() != newStatus) {</span>
+<span class="fc" id="L374">                        tutor.setProfileStatus(newStatus);</span>
+<span class="fc" id="L375">                        tutorRepository.save(tutor);</span>
+                }
+<span class="fc" id="L377">        }</span>
+
+        private Integer calculateProfileCompletion(Tutor tutor) {
+
+<span class="fc" id="L381">                int completed = 0;</span>
+<span class="fc" id="L382">                int total = 13;</span>
+
+<span class="fc bfc" id="L384" title="All 2 branches covered.">                if (tutor.getGender() != null)</span>
+<span class="fc" id="L385">                        completed++;</span>
+
+<span class="fc bfc" id="L387" title="All 4 branches covered.">                if (tutor.getDescription() != null &amp;&amp; !tutor.getDescription().isBlank())</span>
+<span class="fc" id="L388">                        completed++;</span>
+
+<span class="fc bfc" id="L390" title="All 2 branches covered.">                if (tutor.getAddress() != null)</span>
+<span class="fc" id="L391">                        completed++;</span>
+
+<span class="fc bfc" id="L393" title="All 2 branches covered.">                if (tutor.getAcademicProfile() != null)</span>
+<span class="fc" id="L394">                        completed++;</span>
+
+<span class="fc bfc" id="L396" title="All 2 branches covered.">                if (tutor.getTeachingExperienceYears() != null)</span>
+<span class="fc" id="L397">                        completed++;</span>
+
+<span class="fc bfc" id="L399" title="All 2 branches covered.">                if (tutor.getIndustryExperienceYears() != null)</span>
+<span class="fc" id="L400">                        completed++;</span>
+
+<span class="fc bfc" id="L402" title="All 4 branches covered.">                if (tutor.getCurrentOccupation() != null &amp;&amp; !tutor.getCurrentOccupation().isBlank())</span>
+<span class="fc" id="L403">                        completed++;</span>
+
+<span class="fc bfc" id="L405" title="All 2 branches covered.">                if (tutor.getPreferredMode() != null)</span>
+<span class="fc" id="L406">                        completed++;</span>
+
+<span class="fc bfc" id="L408" title="All 2 branches covered.">                if (tutor.getPreferredRadius() != null)</span>
+<span class="fc" id="L409">                        completed++;</span>
+
+<span class="fc bfc" id="L411" title="All 2 branches covered.">                if (tutor.getSalaryMin() != null)</span>
+<span class="fc" id="L412">                        completed++;</span>
+
+<span class="fc bfc" id="L414" title="All 2 branches covered.">                if (tutor.getSalaryMax() != null)</span>
+<span class="fc" id="L415">                        completed++;</span>
+
+<span class="fc bfc" id="L417" title="All 4 branches covered.">                if (tutor.getDemoVideoUrl() != null &amp;&amp; !tutor.getDemoVideoUrl().isBlank())</span>
+<span class="fc" id="L418">                        completed++;</span>
+
+<span class="fc bfc" id="L420" title="All 2 branches covered.">                if (!tutorDocumentRepository.findByTutor_TutorId(tutor.getTutorId()).isEmpty())</span>
+<span class="fc" id="L421">                        completed++;</span>
+
+<span class="fc" id="L423">                return (completed * 100) / total;</span>
+        }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

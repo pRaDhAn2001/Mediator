@@ -59,7 +59,7 @@ public class MatchService {
 
                 validateSearchRequest(request);
 
-                List<Tutor> tutors = tutorRepository.findAll()
+                List<Tutor> tutors = tutorRepository.findSearchableTutors()
                                 .stream()
                                 .filter(this::isTutorSearchable)
                                 .filter(tutor -> matchesFilters(tutor, request))
@@ -70,15 +70,15 @@ public class MatchService {
                                 .sorted(
                                                 Comparator
                                                                 .comparing(
-                                                                                MatchScore::getMatchedSubjects)
-                                                                .reversed()
+                                                                                MatchScore::getMatchedSubjects,
+                                                                                Comparator.reverseOrder())
                                                                 .thenComparing(
                                                                                 MatchScore::getDistance,
                                                                                 Comparator.nullsLast(
                                                                                                 Comparator.naturalOrder()))
                                                                 .thenComparing(
-                                                                                MatchScore::getScore)
-                                                                .reversed())
+                                                                                MatchScore::getScore,
+                                                                                Comparator.reverseOrder()))
                                 .toList();
 
                 return buildSearchResponse(

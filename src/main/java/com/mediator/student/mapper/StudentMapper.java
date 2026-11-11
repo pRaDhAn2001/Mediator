@@ -5,112 +5,142 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
+import com.mediator.common.mapper.AddressMapper;
+import com.mediator.common.mapper.PreferredModeMapper;
 import com.mediator.master.entity.Board;
 import com.mediator.master.entity.ClassLevel;
 import com.mediator.master.entity.Subject;
+import com.mediator.master.dto.SubjectResponse;
 import com.mediator.student.dto.request.StudentProfileRequest;
 import com.mediator.student.dto.response.StudentProfileResponse;
-import com.mediator.master.dto.SubjectResponse;
 import com.mediator.student.entity.Student;
 import com.mediator.student.entity.StudentPreference;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
 public class StudentMapper {
 
-    /**
-     * Entity -> Response DTO
-     */
-    public StudentProfileResponse toResponse(
-            Student student,
-            List<StudentPreference> preferences,
-            Integer completionPercentage) {
+        private final AddressMapper addressMapper;
 
-        List<SubjectResponse> subjects = preferences.stream()
-                .map(StudentPreference::getSubject)
-                .map(this::toSubjectResponse)
-                .collect(Collectors.toList());
+        private final PreferredModeMapper preferredModeMapper;
 
-        return StudentProfileResponse.builder()
-                .firstName(student.getUser().getFirstName())
-                .lastName(student.getUser().getLastName())
-                .email(student.getUser().getEmail())
-                .mobileNumber(student.getUser().getMobileNumber())
+        /**
+         * Converts Student Entity -> StudentProfileResponse
+         */
+        public StudentProfileResponse toResponse(
+                        Student student,
+                        List<StudentPreference> preferences,
+                        Integer profileCompletion) {
 
-                .gender(student.getGender())
-                .address(student.getAddress())
-                .preferredMode(student.getPreferredMode())
-                .preferredRadius(student.getPreferredRadius())
+                List<SubjectResponse> subjects = preferences.stream()
+                                .map(StudentPreference::getSubject)
+                                .map(this::toSubjectResponse)
+                                .collect(Collectors.toList());
 
-                .classLevelId(
-                        student.getClassLevel() != null
-                                ? student.getClassLevel().getId()
-                                : null)
+                return StudentProfileResponse.builder()
 
-                .classStandard(
-                        student.getClassLevel() != null
-                                ? student.getClassLevel().getStandard()
-                                : null)
+                                .firstName(student.getUser().getFirstName())
+                                .lastName(student.getUser().getLastName())
+                                .email(student.getUser().getEmail())
+                                .mobileNumber(student.getUser().getMobileNumber())
 
-                .boardId(
-                        student.getBoard() != null
-                                ? student.getBoard().getId()
-                                : null)
+                                .gender(student.getGender())
 
-                .boardName(
-                        student.getBoard() != null
-                                ? student.getBoard().getName()
-                                : null)
+                                .address(
+                                                addressMapper.toDto(
+                                                                student.getAddress()))
 
-                .schoolName(student.getSchoolName())
+                                .preferredMode(
+                                                preferredModeMapper.toDto(
+                                                                student.getPreferredMode()))
 
-                .parentName(student.getParentName())
-                .parentPhone(student.getParentPhone())
-                .parentEmail(student.getParentEmail())
+                                .preferredRadius(
+                                                student.getPreferredRadius())
 
-                .subjects(subjects)
+                                .classLevelId(
+                                                student.getClassLevel() != null
+                                                                ? student.getClassLevel().getId()
+                                                                : null)
 
-                .profileCompletion(completionPercentage)
+                                .classStandard(
+                                                student.getClassLevel() != null
+                                                                ? student.getClassLevel().getStandard()
+                                                                : null)
 
-                .build();
-    }
+                                .boardId(
+                                                student.getBoard() != null
+                                                                ? student.getBoard().getId()
+                                                                : null)
 
-    /**
-     * Request DTO -> Entity
-     *
-     * Copies only profile fields.
-     * User details are updated separately.
-     */
-    public void updateStudentEntity(
-            Student student,
-            StudentProfileRequest request,
-            Board board,
-            ClassLevel classLevel) {
+                                .boardName(
+                                                student.getBoard() != null
+                                                                ? student.getBoard().getName()
+                                                                : null)
 
-        student.setGender(request.getGender());
+                                .schoolName(student.getSchoolName())
 
-        student.setAddress(request.getAddress());
+                                .parentName(student.getParentName())
 
-        student.setPreferredMode(request.getPreferredMode());
+                                .parentPhone(student.getParentPhone())
 
-        student.setPreferredRadius(request.getPreferredRadius());
+                                .parentEmail(student.getParentEmail())
 
-        student.setBoard(board);
+                                .subjects(subjects)
 
-        student.setClassLevel(classLevel);
+                                .profileCompletion(profileCompletion)
 
-        student.setSchoolName(request.getSchoolName());
+                                .build();
+        }
 
-        student.setParentName(request.getParentName());
-    }
+        /**
+         * Updates existing Student Entity from Request DTO.
+         */
+        public void updateStudentEntity(
+                        Student student,
+                        StudentProfileRequest request,
+                        Board board,
+                        ClassLevel classLevel) {
 
-    /**
-     * Subject -> DTO
-     */
-    private SubjectResponse toSubjectResponse(Subject subject) {
+                student.setGender(request.getGender());
 
-        return SubjectResponse.builder()
-                .id(subject.getId())
-                .name(subject.getName())
-                .build();
-    }
+                student.setAddress(
+                                addressMapper.toEntity(
+                                                request.getAddress()));
+
+                student.setPreferredMode(
+                                preferredModeMapper.toEntity(
+                                                request.getPreferredMode()));
+
+                student.setPreferredRadius(
+                                request.getPreferredRadius());
+
+                student.setBoard(board);
+
+                student.setClassLevel(classLevel);
+
+                student.setSchoolName(
+                                request.getSchoolName());
+
+                student.setParentName(
+                                request.getParentName());
+
+                student.setParentPhone(
+                                request.getParentPhone());
+
+                student.setParentEmail(
+                                request.getParentEmail());
+        }
+
+        /**
+         * Subject -> DTO
+         */
+        public SubjectResponse toSubjectResponse(Subject subject) {
+
+                return SubjectResponse.builder()
+                                .id(subject.getId())
+                                .name(subject.getName())
+                                .build();
+        }
 }

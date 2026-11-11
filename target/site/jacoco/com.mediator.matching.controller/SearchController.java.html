@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.matching.controller</a> &gt; <span class="el_source">SearchController.java</span></div><h1>SearchController.java</h1><pre class="source lang-java linenums">package com.mediator.matching.controller;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import com.mediator.common.dto.ApiResponse;
+import com.mediator.matching.dto.request.TutorSearchRequest;
+import com.mediator.matching.dto.response.TutorDetailsResponse;
+import com.mediator.matching.dto.response.TutorSearchResponse;
+import com.mediator.matching.service.MatchService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping(&quot;/api/v1/search&quot;)
+@RequiredArgsConstructor
+@Validated
+public class SearchController {
+
+        private final MatchService matchService;
+
+        // ============================================================
+        // SEARCH TUTORS
+        // ============================================================
+
+        @PostMapping(&quot;/tutors&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;TutorSearchResponse&gt;&gt; searchTutors(
+                        @Valid @RequestBody TutorSearchRequest request) {
+
+<span class="fc" id="L32">                return ResponseEntity.ok(</span>
+<span class="fc" id="L33">                                ApiResponse.success(</span>
+                                                &quot;Tutors fetched successfully.&quot;,
+<span class="fc" id="L35">                                                matchService.searchTutors(</span>
+                                                                request)));
+        }
+
+        // ============================================================
+        // GET TUTOR DETAILS
+        // ============================================================
+
+        @GetMapping(&quot;/tutors/{tutorId}&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;TutorDetailsResponse&gt;&gt; getTutorDetails(
+                        @PathVariable Long tutorId) {
+
+                /*
+                 * Replace this with however your application currently
+                 * obtains the logged-in user's email.
+                 *
+                 * If your project already has SecurityContext-based
+                 * authentication, use that implementation here.
+                 */
+                String email = org.springframework.security.core.context.SecurityContextHolder
+<span class="fc" id="L55">                                .getContext()</span>
+<span class="fc" id="L56">                                .getAuthentication()</span>
+<span class="fc" id="L57">                                .getName();</span>
+
+<span class="fc" id="L59">                return ResponseEntity.ok(</span>
+<span class="fc" id="L60">                                ApiResponse.success(</span>
+                                                &quot;Tutor details fetched successfully.&quot;,
+<span class="fc" id="L62">                                                matchService.getTutorDetails(</span>
+                                                                email,
+                                                                tutorId)));
+        }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreferredModeMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.common.mapper</a> &gt; <span class="el_source">PreferredModeMapper.java</span></div><h1>PreferredModeMapper.java</h1><pre class="source lang-java linenums">package com.mediator.common.mapper;
+
+import org.springframework.stereotype.Component;
+
+import com.mediator.common.base.PreferredMode;
+import com.mediator.common.dto.PreferredModeDto;
+
+@Component
+<span class="fc" id="L9">public class PreferredModeMapper {</span>
+
+    /**
+     * DTO -&gt; Entity
+     */
+    public PreferredMode toEntity(PreferredModeDto dto) {
+
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        if (dto == null) {</span>
+<span class="nc" id="L17">            return null;</span>
+        }
+
+<span class="fc" id="L20">        return PreferredMode.builder()</span>
+<span class="fc" id="L21">                .online(dto.isOnline())</span>
+<span class="fc" id="L22">                .tutorHome(dto.isTutorHome())</span>
+<span class="fc" id="L23">                .studentHome(dto.isStudentHome())</span>
+<span class="fc" id="L24">                .build();</span>
+    }
+
+    /**
+     * Entity -&gt; DTO
+     */
+    public PreferredModeDto toDto(PreferredMode entity) {
+
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (entity == null) {</span>
+<span class="fc" id="L33">            return null;</span>
+        }
+
+<span class="fc" id="L36">        return PreferredModeDto.builder()</span>
+<span class="fc" id="L37">                .online(entity.isOnline())</span>
+<span class="fc" id="L38">                .tutorHome(entity.isTutorHome())</span>
+<span class="fc" id="L39">                .studentHome(entity.isStudentHome())</span>
+<span class="fc" id="L40">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

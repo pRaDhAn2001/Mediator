@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DistanceUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.common.util</a> &gt; <span class="el_source">DistanceUtils.java</span></div><h1>DistanceUtils.java</h1><pre class="source lang-java linenums">package com.mediator.common.util;
+
+public final class DistanceUtils {
+
+    private static final double EARTH_RADIUS = 6371.0;
+
+    private DistanceUtils() {
+    }
+
+    public static double calculateDistance(
+            Double lat1,
+            Double lon1,
+            Double lat2,
+            Double lon2) {
+
+<span class="pc bpc" id="L16" title="4 of 8 branches missed.">        if (lat1 == null ||</span>
+                lon1 == null ||
+                lat2 == null ||
+                lon2 == null) {
+
+<span class="nc" id="L21">            return Double.MAX_VALUE;</span>
+        }
+
+<span class="fc" id="L24">        double dLat = Math.toRadians(lat2 - lat1);</span>
+<span class="fc" id="L25">        double dLon = Math.toRadians(lon2 - lon1);</span>
+
+<span class="fc" id="L27">        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)</span>
+<span class="fc" id="L28">                + Math.cos(Math.toRadians(lat1))</span>
+<span class="fc" id="L29">                        * Math.cos(Math.toRadians(lat2))</span>
+<span class="fc" id="L30">                        * Math.sin(dLon / 2)</span>
+<span class="fc" id="L31">                        * Math.sin(dLon / 2);</span>
+
+<span class="fc" id="L33">        double c = 2 * Math.atan2(</span>
+<span class="fc" id="L34">                Math.sqrt(a),</span>
+<span class="fc" id="L35">                Math.sqrt(1 - a));</span>
+
+<span class="fc" id="L37">        return EARTH_RADIUS * c;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

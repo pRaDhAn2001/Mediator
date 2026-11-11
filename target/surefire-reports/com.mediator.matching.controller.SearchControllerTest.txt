@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.mediator.matching.controller.SearchControllerTest
+-------------------------------------------------------------------------------
+Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.287 s -- in com.mediator.matching.controller.SearchControllerTest

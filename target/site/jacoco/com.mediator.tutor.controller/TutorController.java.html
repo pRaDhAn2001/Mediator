@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TutorController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.tutor.controller</a> &gt; <span class="el_source">TutorController.java</span></div><h1>TutorController.java</h1><pre class="source lang-java linenums">package com.mediator.tutor.controller;
+
+import java.security.Principal;
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import com.mediator.common.dto.ApiResponse;
+import com.mediator.tutor.dto.dashboard.TutorDashboardResponse;
+import com.mediator.tutor.dto.document.TutorDocumentDto;
+import com.mediator.tutor.dto.request.TutorDocumentsRequest;
+import com.mediator.tutor.dto.request.TutorProfileRequest;
+import com.mediator.tutor.dto.response.TutorProfileResponse;
+import com.mediator.tutor.dto.preference.TutorTeachingPreferenceDto;
+import com.mediator.tutor.dto.request.TutorTeachingPreferenceRequest;
+import com.mediator.tutor.service.TutorService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping(&quot;/api/v1/tutors&quot;)
+@RequiredArgsConstructor
+@Validated
+public class TutorController {
+
+        private final TutorService tutorService;
+
+        /**
+         * Get Tutor Profile
+         */
+        @GetMapping(&quot;/profile&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;TutorProfileResponse&gt;&gt; getProfile(
+                        Principal principal) {
+
+<span class="fc" id="L39">                TutorProfileResponse response = tutorService.getProfile(principal.getName());</span>
+
+<span class="fc" id="L41">                return ResponseEntity.ok(</span>
+<span class="fc" id="L42">                                ApiResponse.success(</span>
+                                                &quot;Tutor profile fetched successfully.&quot;,
+                                                response));
+        }
+
+        /**
+         * Update Tutor Profile
+         */
+        @PutMapping(&quot;/profile&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;TutorProfileResponse&gt;&gt; updateProfile(
+                        Principal principal,
+                        @Valid @RequestBody TutorProfileRequest request) {
+
+<span class="fc" id="L55">                TutorProfileResponse response = tutorService.updateProfile(</span>
+<span class="fc" id="L56">                                principal.getName(),</span>
+                                request);
+
+<span class="fc" id="L59">                return ResponseEntity.ok(</span>
+<span class="fc" id="L60">                                ApiResponse.success(</span>
+                                                &quot;Tutor profile updated successfully.&quot;,
+                                                response));
+        }
+
+        /**
+         * Update Teaching Preferences
+         */
+        @PostMapping(&quot;/preferences&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; updateTeachingPreferences(
+                        Principal principal,
+                        @Valid @RequestBody TutorTeachingPreferenceRequest request) {
+
+<span class="fc" id="L73">                tutorService.updateTeachingPreferences(</span>
+<span class="fc" id="L74">                                principal.getName(),</span>
+                                request);
+
+<span class="fc" id="L77">                return ResponseEntity.ok(</span>
+<span class="fc" id="L78">                                ApiResponse.success(</span>
+                                                &quot;Teaching preferences updated successfully.&quot;,
+                                                null));
+        }
+
+        /**
+         * Get Teaching Preferences
+         */
+        @GetMapping(&quot;/preferences&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;List&lt;TutorTeachingPreferenceDto&gt;&gt;&gt; getTeachingPreferences(
+                        Principal principal) {
+
+<span class="fc" id="L90">                return ResponseEntity.ok(</span>
+<span class="fc" id="L91">                                ApiResponse.success(</span>
+                                                &quot;Teaching preferences fetched successfully.&quot;,
+<span class="fc" id="L93">                                                tutorService.getTeachingPreferences(</span>
+<span class="fc" id="L94">                                                                principal.getName())));</span>
+        }
+
+        /**
+         * Upload Document
+         */
+        @PostMapping(&quot;/documents&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; uploadDocuments(
+                        Principal principal,
+                        @Valid @RequestBody TutorDocumentsRequest request) {
+
+<span class="fc" id="L105">                tutorService.uploadDocuments(</span>
+<span class="fc" id="L106">                                principal.getName(),</span>
+<span class="fc" id="L107">                                request.getDocuments());</span>
+
+<span class="fc" id="L109">                return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L110">                                .body(ApiResponse.success(</span>
+                                                &quot;Documents uploaded successfully.&quot;,
+                                                null));
+        }
+
+        /**
+         * Get Documents
+         */
+        @GetMapping(&quot;/documents&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;List&lt;TutorDocumentDto&gt;&gt;&gt; getDocuments(
+                        Principal principal) {
+
+<span class="fc" id="L122">                return ResponseEntity.ok(</span>
+<span class="fc" id="L123">                                ApiResponse.success(</span>
+                                                &quot;Documents fetched successfully.&quot;,
+<span class="fc" id="L125">                                                tutorService.getDocuments(</span>
+<span class="fc" id="L126">                                                                principal.getName())));</span>
+        }
+
+        /**
+         * Delete Document
+         */
+        @DeleteMapping(&quot;/documents/{documentId}&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; deleteDocument(
+                        Principal principal,
+                        @PathVariable Long documentId) {
+
+<span class="fc" id="L137">                tutorService.deleteDocument(</span>
+<span class="fc" id="L138">                                principal.getName(),</span>
+                                documentId);
+
+<span class="fc" id="L141">                return ResponseEntity.ok(</span>
+<span class="fc" id="L142">                                ApiResponse.success(</span>
+                                                &quot;Document deleted successfully.&quot;,
+                                                null));
+        }
+
+        /**
+         * Tutor Dashboard
+         */
+        @GetMapping(&quot;/dashboard&quot;)
+        public ResponseEntity&lt;ApiResponse&lt;TutorDashboardResponse&gt;&gt; getDashboard(
+                        Principal principal) {
+
+<span class="fc" id="L154">                TutorDashboardResponse response = tutorService.getDashboard(</span>
+<span class="fc" id="L155">                                principal.getName());</span>
+
+<span class="fc" id="L157">                return ResponseEntity.ok(</span>
+<span class="fc" id="L158">                                ApiResponse.success(</span>
+                                                &quot;Dashboard fetched successfully.&quot;,
+                                                response));
+        }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

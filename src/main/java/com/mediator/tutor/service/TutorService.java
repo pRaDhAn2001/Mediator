@@ -2,12 +2,14 @@ package com.mediator.tutor.service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 import com.mediator.subscription.entity.Subscription;
@@ -15,6 +17,7 @@ import com.mediator.subscription.entity.SubscriptionStatus;
 import com.mediator.subscription.repository.SubscriptionRepository;
 import com.mediator.tutor.dto.dashboard.TutorDashboardResponse;
 import com.mediator.tutor.dto.document.TutorDocumentDto;
+import com.mediator.tutor.entity.DocumentType;
 import com.mediator.tutor.entity.ProfileStatus;
 import com.mediator.tutor.entity.TutorDocument;
 
@@ -25,7 +28,7 @@ import com.mediator.master.entity.Subject;
 import com.mediator.tutor.dto.preference.TutorTeachingPreferenceDto;
 import com.mediator.tutor.dto.request.TutorTeachingPreferenceRequest;
 import com.mediator.tutor.entity.TutorTeachingPreference;
-
+import com.mediator.tutor.entity.VerificationStatus;
 import com.mediator.common.exception.ResourceNotFoundException;
 import com.mediator.master.repository.BoardRepository;
 import com.mediator.master.repository.ClassLevelRepository;
@@ -266,26 +269,44 @@ public class TutorService {
         }
 
         @Transactional
-        public void uploadDocument(
+        public void uploadDocuments(
                         String email,
-                        TutorDocumentDto request) {
+                        List<TutorDocumentDto> requests) {
 
                 User user = getUser(email);
 
                 Tutor tutor = tutorRepository.findByUser(user)
-                                .orElseThrow(() -> new ResourceNotFoundException("Tutor profile not found."));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Tutor profile not found."));
 
-                TutorDocument document = TutorDocument.builder()
+                List<TutorDocument> documents = requests.stream()
+                                .map(dto -> TutorDocument.builder()
 
-                                .tutor(tutor)
+                                                .tutor(tutor)
 
-                                .documentType(request.getDocumentType())
+                                                .documentType(dto.getDocumentType())
 
-                                .documentUrl(request.getDocumentUrl())
+                                                .documentUrl(dto.getDocumentUrl())
 
-                                .build();
+                                                .verificationStatus(VerificationStatus.PENDING)
 
-                tutorDocumentRepository.save(document);
+                                                .build())
+
+                                .toList();
+
+                Set<DocumentType> requestTypes = new HashSet<>();
+
+                for (TutorDocumentDto dto : requests) {
+
+                        if (!requestTypes.add(dto.getDocumentType())) {
+
+                                throw new BadRequestException(
+                                                "Duplicate document type in request: "
+                                                                + dto.getDocumentType());
+                        }
+                }
+
+                tutorDocumentRepository.saveAll(documents);
         }
 
         @Transactional(readOnly = true)

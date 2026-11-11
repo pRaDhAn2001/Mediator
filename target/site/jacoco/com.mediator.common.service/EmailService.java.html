@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmailService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.common.service</a> &gt; <span class="el_source">EmailService.java</span></div><h1>EmailService.java</h1><pre class="source lang-java linenums">package com.mediator.common.service;
+
+import java.util.List;
+
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+public class EmailService {
+
+    private final JavaMailSender mailSender;
+
+    public void sendMatchRequestNotification(
+            String tutorEmail,
+            String tutorName,
+            String studentName,
+            List&lt;String&gt; subjects,
+            String message) {
+
+<span class="fc" id="L24">        SimpleMailMessage mail = new SimpleMailMessage();</span>
+
+<span class="fc" id="L26">        mail.setTo(tutorEmail);</span>
+
+<span class="fc" id="L28">        mail.setSubject(</span>
+                &quot;New Tuition Request Received&quot;);
+
+<span class="fc bfc" id="L31" title="All 4 branches covered.">        String subjectText = subjects == null || subjects.isEmpty()</span>
+<span class="fc" id="L32">                ? &quot;Requested subjects not specified&quot;</span>
+<span class="fc" id="L33">                : String.join(&quot;, &quot;, subjects);</span>
+
+<span class="fc" id="L35">        mail.setText(</span>
+                &quot;Hello &quot; + tutorName + &quot;,\n\n&quot;
+                        + &quot;You have received a new tuition request.\n\n&quot;
+
+                        + &quot;Student: &quot; + studentName + &quot;\n&quot;
+
+                        + &quot;Subjects: &quot; + subjectText + &quot;\n&quot;
+
+                        + &quot;Message: &quot;
+<span class="fc bfc" id="L44" title="All 4 branches covered.">                        + (message == null || message.isBlank()</span>
+<span class="fc" id="L45">                                ? &quot;No message provided.&quot;</span>
+<span class="fc" id="L46">                                : message)</span>
+
+                        + &quot;\n\n&quot;
+                        + &quot;Please login to your tutor dashboard &quot;
+                        + &quot;to review the request and contact the student.\n\n&quot;
+
+                        + &quot;Regards,\n&quot;
+                        + &quot;Tutor-Student Mediator&quot;);
+
+<span class="fc" id="L55">        mailSender.send(mail);</span>
+<span class="fc" id="L56">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

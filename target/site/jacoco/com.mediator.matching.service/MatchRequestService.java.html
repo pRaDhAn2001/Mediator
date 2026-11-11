@@ -1,0 +1,642 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatchRequestService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Mediator</a> &gt; <a href="index.source.html" class="el_package">com.mediator.matching.service</a> &gt; <span class="el_source">MatchRequestService.java</span></div><h1>MatchRequestService.java</h1><pre class="source lang-java linenums">package com.mediator.matching.service;
+
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.mediator.auth.entity.User;
+import com.mediator.auth.repository.UserRepository;
+import com.mediator.common.exception.BadRequestException;
+import com.mediator.common.exception.ResourceNotFoundException;
+import com.mediator.master.entity.Subject;
+import com.mediator.master.repository.SubjectRepository;
+import com.mediator.matching.dto.request.CreateMatchRequest;
+import com.mediator.matching.dto.request.TutorActionRequest;
+import com.mediator.matching.dto.response.MatchRequestResponse;
+import com.mediator.matching.entity.MatchRequest;
+import com.mediator.matching.entity.MatchRequestStatus;
+import com.mediator.matching.entity.MatchRequestSubject;
+import com.mediator.matching.entity.SubjectRequestStatus;
+import com.mediator.matching.mapper.MatchRequestMapper;
+import com.mediator.matching.repository.MatchRequestRepository;
+import com.mediator.matching.repository.MatchRequestSubjectRepository;
+import com.mediator.student.entity.Student;
+import com.mediator.student.repository.StudentRepository;
+import com.mediator.tutor.entity.Tutor;
+import com.mediator.tutor.entity.TutorTeachingPreference;
+import com.mediator.tutor.repository.TutorRepository;
+import com.mediator.tutor.repository.TutorTeachingPreferenceRepository;
+
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class MatchRequestService {
+
+        private final MatchRequestRepository matchRequestRepository;
+        private final MatchRequestSubjectRepository matchRequestSubjectRepository;
+
+        private final StudentRepository studentRepository;
+        private final TutorRepository tutorRepository;
+        private final SubjectRepository subjectRepository;
+        private final UserRepository userRepository;
+
+        private final MatchRequestMapper matchRequestMapper;
+
+        private final TutorTeachingPreferenceRepository tutorTeachingPreferenceRepository;
+
+        // =========================================================
+        // CREATE REQUEST
+        // =========================================================
+
+        public MatchRequestResponse createRequest(
+                        String email,
+                        CreateMatchRequest request) {
+
+<span class="fc" id="L64">                Student student = getStudent(email);</span>
+
+<span class="fc" id="L66">                Tutor tutor = tutorRepository.findById(request.getTutorId())</span>
+<span class="fc" id="L67">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;Tutor not found with ID: &quot;
+<span class="fc" id="L69">                                                                + request.getTutorId()));</span>
+
+<span class="fc" id="L71">                validateTutorEligibility(tutor);</span>
+
+<span class="fc" id="L73">                validateSubjectIds(request.getSubjectIds());</span>
+
+<span class="fc" id="L75">                List&lt;MatchRequestStatus&gt; activeStatuses = List.of(</span>
+                                MatchRequestStatus.REQUESTED,
+                                MatchRequestStatus.CONNECTED,
+                                MatchRequestStatus.PARTIALLY_FINALIZED);
+
+<span class="fc" id="L80">                boolean alreadyExists = matchRequestRepository</span>
+<span class="fc" id="L81">                                .existsByStudent_StudentIdAndTutor_TutorIdAndStatusIn(</span>
+<span class="fc" id="L82">                                                student.getStudentId(),</span>
+<span class="fc" id="L83">                                                tutor.getTutorId(),</span>
+                                                activeStatuses);
+
+<span class="fc bfc" id="L86" title="All 2 branches covered.">                if (alreadyExists) {</span>
+<span class="fc" id="L87">                        throw new BadRequestException(</span>
+                                        &quot;You already have an active request for this tutor.&quot;);
+                }
+
+                /*
+                 * Make sure the tutor actually teaches every requested subject.
+                 */
+<span class="fc" id="L94">                validateTutorSubjects(</span>
+                                tutor,
+                                student,
+<span class="fc" id="L97">                                request.getSubjectIds());</span>
+
+<span class="fc" id="L99">                MatchRequest matchRequest = MatchRequest.builder()</span>
+<span class="fc" id="L100">                                .student(student)</span>
+<span class="fc" id="L101">                                .tutor(tutor)</span>
+<span class="fc" id="L102">                                .status(MatchRequestStatus.REQUESTED)</span>
+<span class="fc" id="L103">                                .message(request.getMessage())</span>
+<span class="fc" id="L104">                                .build();</span>
+
+<span class="fc" id="L106">                matchRequestRepository.save(matchRequest);</span>
+
+<span class="fc" id="L108">                List&lt;MatchRequestSubject&gt; requestSubjects = request.getSubjectIds()</span>
+<span class="fc" id="L109">                                .stream()</span>
+<span class="fc" id="L110">                                .map(subjectId -&gt; {</span>
+
+<span class="fc" id="L112">                                        Subject subject = subjectRepository.findById(subjectId)</span>
+<span class="fc" id="L113">                                                        .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                                        &quot;Subject not found with ID: &quot;
+                                                                                        + subjectId));
+
+<span class="fc" id="L117">                                        return MatchRequestSubject.builder()</span>
+<span class="fc" id="L118">                                                        .matchRequest(matchRequest)</span>
+<span class="fc" id="L119">                                                        .subject(subject)</span>
+<span class="fc" id="L120">                                                        .status(SubjectRequestStatus.REQUESTED)</span>
+<span class="fc" id="L121">                                                        .build();</span>
+                                })
+<span class="fc" id="L123">                                .toList();</span>
+
+<span class="fc" id="L125">                matchRequestSubjectRepository.saveAll(requestSubjects);</span>
+
+<span class="fc" id="L127">                matchRequest.setRequestedSubjects(requestSubjects);</span>
+
+                /*
+                 * IMPORTANT:
+                 * Student response never contains tutor contact details.
+                 */
+<span class="fc" id="L133">                return matchRequestMapper.toStudentResponse(matchRequest);</span>
+        }
+
+        // =========================================================
+        // STUDENT REQUESTS
+        // =========================================================
+
+        @Transactional(readOnly = true)
+        public List&lt;MatchRequestResponse&gt; getStudentRequests(
+                        String email) {
+
+<span class="fc" id="L144">                Student student = getStudent(email);</span>
+
+<span class="fc" id="L146">                return matchRequestRepository</span>
+<span class="fc" id="L147">                                .findByStudent_StudentId(student.getStudentId())</span>
+<span class="fc" id="L148">                                .stream()</span>
+<span class="fc" id="L149">                                .map(matchRequestMapper::toStudentResponse)</span>
+<span class="fc" id="L150">                                .toList();</span>
+        }
+
+        // =========================================================
+        // TUTOR REQUESTS
+        // =========================================================
+
+        @Transactional(readOnly = true)
+        public List&lt;MatchRequestResponse&gt; getTutorRequests(
+                        String email) {
+
+<span class="fc" id="L161">                Tutor tutor = getTutor(email);</span>
+
+<span class="fc" id="L163">                return matchRequestRepository</span>
+<span class="fc" id="L164">                                .findByTutor_TutorId(tutor.getTutorId())</span>
+<span class="fc" id="L165">                                .stream()</span>
+<span class="fc" id="L166">                                .map(matchRequestMapper::toTutorResponse)</span>
+<span class="fc" id="L167">                                .toList();</span>
+        }
+
+        // =========================================================
+        // REQUEST DETAILS
+        // =========================================================
+
+        @Transactional(readOnly = true)
+        public MatchRequestResponse getRequestDetails(
+                        String email,
+                        Long requestId) {
+
+<span class="fc" id="L179">                MatchRequest request = getRequest(requestId);</span>
+
+<span class="fc" id="L181">                boolean isStudent = request.getStudent()</span>
+<span class="fc" id="L182">                                .getUser()</span>
+<span class="fc" id="L183">                                .getEmail()</span>
+<span class="fc" id="L184">                                .equalsIgnoreCase(email);</span>
+
+<span class="fc" id="L186">                boolean isTutor = request.getTutor()</span>
+<span class="fc" id="L187">                                .getUser()</span>
+<span class="fc" id="L188">                                .getEmail()</span>
+<span class="fc" id="L189">                                .equalsIgnoreCase(email);</span>
+
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                if (isTutor) {</span>
+<span class="fc" id="L192">                        return matchRequestMapper.toTutorResponse(request);</span>
+                }
+
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                if (isStudent) {</span>
+<span class="fc" id="L196">                        return matchRequestMapper.toStudentResponse(request);</span>
+                }
+
+<span class="fc" id="L199">                throw new AccessDeniedException(</span>
+                                &quot;You are not allowed to view this match request.&quot;);
+        }
+        // =========================================================
+        // CANCEL
+        // =========================================================
+
+        public MatchRequestResponse cancelRequest(
+                        String email,
+                        Long requestId) {
+
+<span class="fc" id="L210">                MatchRequest request = getRequest(requestId);</span>
+
+<span class="fc" id="L212">                validateStudentOwnership(request, email);</span>
+
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                if (request.getStatus() != MatchRequestStatus.REQUESTED) {</span>
+<span class="fc" id="L215">                        throw new BadRequestException(</span>
+                                        &quot;Only a requested match can be cancelled.&quot;);
+                }
+
+<span class="fc" id="L219">                request.setStatus(MatchRequestStatus.CANCELLED);</span>
+
+<span class="fc" id="L221">                request.getRequestedSubjects()</span>
+<span class="fc" id="L222">                                .forEach(subject -&gt; subject.setStatus(SubjectRequestStatus.REJECTED));</span>
+
+<span class="fc" id="L224">                matchRequestRepository.save(request);</span>
+
+<span class="fc" id="L226">                return matchRequestMapper.toStudentResponse(request);</span>
+        }
+
+        // =========================================================
+        // CONNECT
+        // =========================================================
+
+        public MatchRequestResponse connectStudent(
+                        String email,
+                        Long requestId) {
+
+<span class="fc" id="L237">                MatchRequest request = getRequest(requestId);</span>
+
+<span class="fc" id="L239">                validateTutorOwnership(request, email);</span>
+
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                if (request.getStatus() != MatchRequestStatus.REQUESTED) {</span>
+<span class="fc" id="L242">                        throw new BadRequestException(</span>
+                                        &quot;Only a REQUESTED match can be connected.&quot;);
+                }
+
+<span class="fc" id="L246">                request.setStatus(MatchRequestStatus.CONNECTED);</span>
+<span class="fc" id="L247">                request.setConnectedAt(LocalDateTime.now());</span>
+
+                /*
+                 * Subjects remain REQUESTED at this point.
+                 *
+                 * Tutor has only accepted the connection,
+                 * not yet finalized individual subjects.
+                 */
+<span class="fc" id="L255">                matchRequestRepository.save(request);</span>
+
+<span class="fc" id="L257">                return matchRequestMapper.toTutorResponse(request);</span>
+        }
+
+        // =========================================================
+        // PARTIAL FINALIZE
+        // =========================================================
+
+        public MatchRequestResponse partiallyFinalize(
+                        String email,
+                        Long requestId,
+                        TutorActionRequest action) {
+
+<span class="fc" id="L269">                MatchRequest request = getRequest(requestId);</span>
+
+<span class="fc" id="L271">                validateTutorOwnership(request, email);</span>
+
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                if (request.getStatus() != MatchRequestStatus.CONNECTED) {</span>
+<span class="fc" id="L274">                        throw new BadRequestException(</span>
+                                        &quot;Partial finalization is allowed only for CONNECTED requests.&quot;);
+                }
+
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                if (action == null) {</span>
+<span class="fc" id="L279">                        throw new BadRequestException(</span>
+                                        &quot;Tutor action is required.&quot;);
+                }
+
+<span class="fc" id="L283">                List&lt;Long&gt; acceptedSubjectIds = action.getAcceptedSubjectIds();</span>
+
+<span class="fc bfc" id="L285" title="All 4 branches covered.">                if (acceptedSubjectIds == null || acceptedSubjectIds.isEmpty()) {</span>
+<span class="fc" id="L286">                        throw new BadRequestException(</span>
+                                        &quot;At least one subject must be accepted.&quot;);
+                }
+
+<span class="fc" id="L290">                validateAcceptedSubjectIds(request, acceptedSubjectIds);</span>
+
+<span class="fc" id="L292">                Set&lt;Long&gt; acceptedIds = new HashSet&lt;&gt;(acceptedSubjectIds);</span>
+
+<span class="fc" id="L294">                long acceptedCount = request.getRequestedSubjects()</span>
+<span class="fc" id="L295">                                .stream()</span>
+<span class="fc" id="L296">                                .filter(subject -&gt; acceptedIds.contains(subject.getSubject().getId()))</span>
+<span class="fc" id="L297">                                .count();</span>
+
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">                if (acceptedCount == 0) {</span>
+<span class="nc" id="L300">                        throw new BadRequestException(</span>
+                                        &quot;At least one subject must be accepted.&quot;);
+                }
+
+<span class="fc bfc" id="L304" title="All 2 branches covered.">                for (MatchRequestSubject requestSubject : request.getRequestedSubjects()) {</span>
+<span class="fc" id="L305">                        Long subjectId = requestSubject.getSubject().getId();</span>
+
+<span class="fc bfc" id="L307" title="All 2 branches covered.">                        if (acceptedIds.contains(subjectId)) {</span>
+<span class="fc" id="L308">                                requestSubject.setStatus(SubjectRequestStatus.ACCEPTED);</span>
+                        } else {
+<span class="fc" id="L310">                                requestSubject.setStatus(SubjectRequestStatus.REJECTED);</span>
+                        }
+<span class="fc" id="L312">                }</span>
+
+<span class="fc bfc" id="L314" title="All 2 branches covered.">                if (acceptedCount == request.getRequestedSubjects().size()) {</span>
+<span class="fc" id="L315">                        request.setStatus(MatchRequestStatus.FINALIZED);</span>
+<span class="fc" id="L316">                        request.setFinalizedAt(LocalDateTime.now());</span>
+
+<span class="fc" id="L318">                        request.getRequestedSubjects()</span>
+<span class="fc" id="L319">                                        .forEach(subject -&gt; subject.setStatus(SubjectRequestStatus.FINALIZED));</span>
+                } else {
+<span class="fc" id="L321">                        request.setStatus(MatchRequestStatus.PARTIALLY_FINALIZED);</span>
+                }
+
+<span class="fc" id="L324">                matchRequestRepository.save(request);</span>
+
+<span class="fc" id="L326">                return matchRequestMapper.toTutorResponse(request);</span>
+        }
+
+        // =========================================================
+        // FINALIZE
+        // =========================================================
+
+        public MatchRequestResponse finalizeRequest(
+                        String email,
+                        Long requestId) {
+
+<span class="fc" id="L337">                MatchRequest request = getRequest(requestId);</span>
+
+<span class="fc" id="L339">                validateTutorOwnership(request, email);</span>
+
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                if (request.getStatus() != MatchRequestStatus.CONNECTED</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">                                &amp;&amp; request.getStatus() != MatchRequestStatus.PARTIALLY_FINALIZED) {</span>
+
+<span class="fc" id="L344">                        throw new BadRequestException(</span>
+                                        &quot;Only CONNECTED or PARTIALLY_FINALIZED requests can be finalized.&quot;);
+                }
+
+                /*
+                 * Find subjects that were accepted.
+                 */
+<span class="fc" id="L351">                List&lt;MatchRequestSubject&gt; acceptedSubjects = request.getRequestedSubjects()</span>
+<span class="fc" id="L352">                                .stream()</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                                .filter(subject -&gt; subject.getStatus() == SubjectRequestStatus.ACCEPTED)</span>
+<span class="fc" id="L354">                                .toList();</span>
+
+                /*
+                 * If request is CONNECTED, the tutor has not selected
+                 * subjects yet.
+                 *
+                 * In this case all requested subjects can be finalized.
+                 */
+<span class="fc bfc" id="L362" title="All 2 branches covered.">                if (request.getStatus() == MatchRequestStatus.CONNECTED) {</span>
+
+<span class="fc" id="L364">                        request.getRequestedSubjects()</span>
+<span class="fc" id="L365">                                        .forEach(subject -&gt; {</span>
+
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">                                                if (subject.getStatus() == SubjectRequestStatus.REQUESTED) {</span>
+
+<span class="fc" id="L369">                                                        subject.setStatus(</span>
+                                                                        SubjectRequestStatus.FINALIZED);
+                                                }
+<span class="fc" id="L372">                                        });</span>
+
+                } else {
+
+                        /*
+                         * PARTIALLY_FINALIZED:
+                         * only ACCEPTED subjects become FINALIZED.
+                         *
+                         * REJECTED subjects remain REJECTED.
+                         */
+<span class="fc bfc" id="L382" title="All 2 branches covered.">                        if (acceptedSubjects.isEmpty()) {</span>
+<span class="fc" id="L383">                                throw new BadRequestException(</span>
+                                                &quot;No accepted subjects are available for finalization.&quot;);
+                        }
+
+<span class="fc" id="L387">                        acceptedSubjects.forEach(subject -&gt; subject.setStatus(</span>
+                                        SubjectRequestStatus.FINALIZED));
+                }
+
+<span class="fc" id="L391">                request.setStatus(</span>
+                                MatchRequestStatus.FINALIZED);
+
+<span class="fc" id="L394">                request.setFinalizedAt(</span>
+<span class="fc" id="L395">                                LocalDateTime.now());</span>
+
+<span class="fc" id="L397">                matchRequestRepository.save(request);</span>
+
+<span class="fc" id="L399">                return matchRequestMapper.toTutorResponse(request);</span>
+        }
+
+        // =========================================================
+        // VALIDATION METHODS
+        // =========================================================
+
+        private void validateTutorEligibility(Tutor tutor) {
+
+                /*
+                 * Keep this aligned with your actual Tutor entity.
+                 *
+                 * Your current project uses APPROVED verification status.
+                 */
+<span class="fc bfc" id="L413" title="All 2 branches covered.">                if (tutor.getVerificationStatus() == null) {</span>
+<span class="fc" id="L414">                        throw new BadRequestException(</span>
+                                        &quot;Tutor verification status is not available.&quot;);
+                }
+
+                /*
+                 * If findById() is used here, an unapproved tutor could otherwise
+                 * receive requests.
+                 *
+                 * Replace this condition with your exact ProfileStatus logic
+                 * if LIVE status is mandatory.
+                 */
+<span class="fc" id="L425">                if (!tutor.getVerificationStatus().name()</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">                                .equalsIgnoreCase(&quot;APPROVED&quot;)) {</span>
+
+<span class="fc" id="L428">                        throw new BadRequestException(</span>
+                                        &quot;You cannot send a request to an unverified tutor.&quot;);
+                }
+<span class="fc" id="L431">        }</span>
+
+        private void validateSubjectIds(List&lt;Long&gt; subjectIds) {
+<span class="fc bfc" id="L434" title="All 4 branches covered.">                if (subjectIds == null || subjectIds.isEmpty()) {</span>
+<span class="fc" id="L435">                        throw new BadRequestException(</span>
+                                        &quot;At least one subject is required.&quot;);
+                }
+
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                if (subjectIds.stream().anyMatch(Objects::isNull)) {</span>
+<span class="fc" id="L440">                        throw new BadRequestException(</span>
+                                        &quot;Subject IDs must not contain null values.&quot;);
+                }
+
+<span class="fc" id="L444">                Set&lt;Long&gt; uniqueIds = new HashSet&lt;&gt;(subjectIds);</span>
+
+<span class="fc bfc" id="L446" title="All 2 branches covered.">                if (uniqueIds.size() != subjectIds.size()) {</span>
+<span class="fc" id="L447">                        throw new BadRequestException(</span>
+                                        &quot;Duplicate subject IDs are not allowed.&quot;);
+                }
+<span class="fc" id="L450">        }</span>
+
+        private void validateTutorSubjects(
+                        Tutor tutor,
+                        Student student,
+                        List&lt;Long&gt; requestedSubjectIds) {
+
+                // Student must have a class level configured
+<span class="fc bfc" id="L458" title="All 2 branches covered.">                if (student.getClassLevel() == null) {</span>
+<span class="fc" id="L459">                        throw new BadRequestException(</span>
+                                        &quot;Student class level is not configured.&quot;);
+                }
+
+                // Student must have a board configured
+<span class="fc bfc" id="L464" title="All 2 branches covered.">                if (student.getBoard() == null) {</span>
+<span class="fc" id="L465">                        throw new BadRequestException(</span>
+                                        &quot;Student board is not configured.&quot;);
+                }
+
+                // Get all teaching preferences configured for this tutor
+<span class="fc" id="L470">                List&lt;TutorTeachingPreference&gt; tutorPreferences = tutorTeachingPreferenceRepository</span>
+<span class="fc" id="L471">                                .findByTutor_TutorId(tutor.getTutorId());</span>
+
+                // If tutor has no teaching preferences at all
+<span class="fc bfc" id="L474" title="All 2 branches covered.">                if (tutorPreferences.isEmpty()) {</span>
+<span class="fc" id="L475">                        throw new BadRequestException(</span>
+                                        &quot;Tutor has no teaching preferences configured.&quot;);
+                }
+
+                /*
+                 * Keep only the tutor preferences that match
+                 * the student's:
+                 *
+                 * 1. Class Level
+                 * 2. Board
+                 *
+                 * Example:
+                 *
+                 * Student:
+                 * Class 10 + CBSE
+                 *
+                 * Tutor:
+                 * Mathematics + Class 10 + CBSE -&gt; considered
+                 * Physics + Class 10 + CBSE -&gt; considered
+                 * Chemistry + Class 12 + CBSE -&gt; ignored
+                 * Mathematics + Class 10 + ICSE -&gt; ignored
+                 */
+<span class="fc" id="L497">                Set&lt;Long&gt; matchingTutorSubjectIds = tutorPreferences.stream()</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">                                .filter(preference -&gt; preference.getClassLevel() != null</span>
+<span class="fc" id="L499">                                                &amp;&amp; preference.getClassLevel()</span>
+<span class="fc" id="L500">                                                                .getId()</span>
+<span class="fc bfc" id="L501" title="All 2 branches covered.">                                                                .equals(</span>
+<span class="fc" id="L502">                                                                                student.getClassLevel().getId()))</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">                                .filter(preference -&gt; preference.getBoard() != null</span>
+<span class="fc" id="L504">                                                &amp;&amp; preference.getBoard()</span>
+<span class="fc" id="L505">                                                                .getId()</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">                                                                .equals(</span>
+<span class="fc" id="L507">                                                                                student.getBoard().getId()))</span>
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">                                .filter(preference -&gt; preference.getSubject() != null)</span>
+<span class="fc" id="L509">                                .map(preference -&gt; preference.getSubject().getId())</span>
+<span class="fc" id="L510">                                .collect(Collectors.toSet());</span>
+
+                /*
+                 * Convert requested subjects to a Set.
+                 *
+                 * This also makes containsAll() efficient.
+                 */
+<span class="fc" id="L517">                Set&lt;Long&gt; requestedSubjectIdSet = new HashSet&lt;&gt;(requestedSubjectIds);</span>
+
+                /*
+                 * Find the subjects requested by the student
+                 * that the tutor does NOT teach for the
+                 * student's selected class and board.
+                 */
+<span class="fc" id="L524">                Set&lt;Long&gt; unavailableSubjectIds = requestedSubjectIdSet.stream()</span>
+<span class="fc" id="L525">                                .filter(subjectId -&gt; !matchingTutorSubjectIds</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">                                                .contains(subjectId))</span>
+<span class="fc" id="L527">                                .collect(Collectors.toSet());</span>
+
+                /*
+                 * If even one requested subject is unavailable,
+                 * reject the match request.
+                 */
+<span class="fc bfc" id="L533" title="All 2 branches covered.">                if (!unavailableSubjectIds.isEmpty()) {</span>
+<span class="fc" id="L534">                        throw new BadRequestException(</span>
+                                        &quot;Tutor does not teach the following requested subject IDs &quot;
+                                                        + &quot;for the student's selected class and board: &quot;
+                                                        + unavailableSubjectIds);
+                }
+<span class="fc" id="L539">        }</span>
+
+        private void validateAcceptedSubjectIds(
+                        MatchRequest request,
+                        List&lt;Long&gt; acceptedSubjectIds) {
+
+<span class="pc bpc" id="L545" title="1 of 4 branches missed.">                if (acceptedSubjectIds == null || acceptedSubjectIds.isEmpty()) {</span>
+<span class="fc" id="L546">                        throw new BadRequestException(</span>
+                                        &quot;At least one subject must be accepted.&quot;);
+                }
+
+<span class="fc bfc" id="L550" title="All 2 branches covered.">                if (acceptedSubjectIds.stream().anyMatch(Objects::isNull)) {</span>
+<span class="fc" id="L551">                        throw new BadRequestException(</span>
+                                        &quot;Accepted subject IDs must not contain null values.&quot;);
+                }
+
+<span class="fc" id="L555">                Set&lt;Long&gt; requestedSubjectIds = request.getRequestedSubjects()</span>
+<span class="fc" id="L556">                                .stream()</span>
+<span class="fc" id="L557">                                .map(subject -&gt; subject.getSubject().getId())</span>
+<span class="fc" id="L558">                                .collect(Collectors.toSet());</span>
+
+<span class="fc" id="L560">                Set&lt;Long&gt; acceptedIds = new HashSet&lt;&gt;(acceptedSubjectIds);</span>
+
+<span class="fc bfc" id="L562" title="All 2 branches covered.">                if (acceptedIds.size() != acceptedSubjectIds.size()) {</span>
+<span class="fc" id="L563">                        throw new BadRequestException(</span>
+                                        &quot;Duplicate accepted subject IDs are not allowed.&quot;);
+                }
+
+<span class="fc bfc" id="L567" title="All 2 branches covered.">                if (!requestedSubjectIds.containsAll(acceptedIds)) {</span>
+<span class="fc" id="L568">                        throw new BadRequestException(</span>
+                                        &quot;Tutor can only accept subjects included in the original request.&quot;);
+                }
+<span class="fc" id="L571">        }</span>
+
+        // =========================================================
+        // OWNERSHIP
+        // =========================================================
+
+        private void validateStudentOwnership(
+                        MatchRequest request,
+                        String email) {
+
+<span class="fc" id="L581">                String studentEmail = request.getStudent()</span>
+<span class="fc" id="L582">                                .getUser()</span>
+<span class="fc" id="L583">                                .getEmail();</span>
+
+<span class="fc bfc" id="L585" title="All 2 branches covered.">                if (!studentEmail.equalsIgnoreCase(email)) {</span>
+<span class="fc" id="L586">                        throw new BadRequestException(</span>
+                                        &quot;You are not allowed to modify this request.&quot;);
+                }
+<span class="fc" id="L589">        }</span>
+
+        private void validateTutorOwnership(
+                        MatchRequest request,
+                        String email) {
+
+<span class="fc" id="L595">                String tutorEmail = request.getTutor()</span>
+<span class="fc" id="L596">                                .getUser()</span>
+<span class="fc" id="L597">                                .getEmail();</span>
+
+<span class="fc bfc" id="L599" title="All 2 branches covered.">                if (!tutorEmail.equalsIgnoreCase(email)) {</span>
+<span class="fc" id="L600">                        throw new BadRequestException(</span>
+                                        &quot;You are not allowed to modify this request.&quot;);
+                }
+<span class="fc" id="L603">        }</span>
+
+        // =========================================================
+        // ENTITY RETRIEVAL
+        // =========================================================
+
+        private MatchRequest getRequest(Long requestId) {
+
+<span class="fc" id="L611">                return matchRequestRepository</span>
+<span class="fc" id="L612">                                .findById(requestId)</span>
+<span class="fc" id="L613">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;Match request not found with ID: &quot;
+                                                                + requestId));
+        }
+
+        private Student getStudent(String email) {
+
+<span class="fc" id="L620">                User user = userRepository.findByEmail(email)</span>
+<span class="fc" id="L621">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;User not found.&quot;));
+
+<span class="fc" id="L624">                return studentRepository</span>
+<span class="fc" id="L625">                                .findByUser(user)</span>
+<span class="fc" id="L626">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;Student profile not found.&quot;));
+        }
+
+        private Tutor getTutor(String email) {
+
+<span class="fc" id="L632">                User user = userRepository.findByEmail(email)</span>
+<span class="fc" id="L633">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;User not found.&quot;));
+
+<span class="fc" id="L636">                return tutorRepository</span>
+<span class="fc" id="L637">                                .findByUser(user)</span>
+<span class="fc" id="L638">                                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                                                &quot;Tutor profile not found.&quot;));
+        }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
